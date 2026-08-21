@@ -1,0 +1,14 @@
+### Create Customer
+POST http://localhost:8080/api/customers
+Content-Type: application/json
+
+{
+  "firstName": "Blend",
+  "lastName": "Buzuku",
+  "email": "john.doe@example.com",
+  "phone": "+38344123456",
+  "dateOfBirth": "2000-05-15"
+}
+
+### Get All Customers
+GET http://localhost:8080/api/customers
