@@ -241,3 +241,4 @@ generated-test-sources/
 *.seed
 *.tgz
 *.tar.gz
+start-env.ps1
