@@ -242,3 +242,12 @@ generated-test-sources/
 *.tgz
 *.tar.gz
 start-env.ps1
+
+# ==========================================
+
+# Local tooling / scratch
+
+# ==========================================
+
+.claude/
+backend-structure.txt
