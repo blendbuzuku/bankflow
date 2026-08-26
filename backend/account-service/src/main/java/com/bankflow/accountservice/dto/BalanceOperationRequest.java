@@ -3,11 +3,13 @@ package com.bankflow.accountservice.dto;
 import com.bankflow.accountservice.entity.BalanceOperationType;
 import com.bankflow.accountservice.entity.Currency;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 
 public class BalanceOperationRequest {
+
 
     @NotNull
     @DecimalMin(value = "0.01")
@@ -18,6 +20,9 @@ public class BalanceOperationRequest {
 
     @NotNull
     private Currency currency;
+
+    @NotBlank
+    private String operationId;
 
     public BalanceOperationRequest() {
     }
@@ -44,5 +49,13 @@ public class BalanceOperationRequest {
 
     public void setCurrency(Currency currency) {
         this.currency = currency;
+    }
+
+    public String getOperationId() {
+        return operationId;
+    }
+
+    public void setOperationId(String operationId) {
+        this.operationId = operationId;
     }
 }

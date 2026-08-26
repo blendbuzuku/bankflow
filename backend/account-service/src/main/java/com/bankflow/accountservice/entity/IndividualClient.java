@@ -20,6 +20,11 @@ public class IndividualClient extends Client {
         setClientType(ClientType.INDIVIDUAL);
     }
 
+    @Override
+    public String getDisplayName() {
+        return (firstName + " " + lastName).trim();
+    }
+
     public String getFirstName() {
         return firstName;
     }

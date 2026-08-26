@@ -42,10 +42,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String authorization =
                 request.getHeader("Authorization");
 
-        System.out.println(
-                "Authorization header: " + authorization
-        );
-
         if (authorization == null
                 || !authorization.startsWith("Bearer ")) {
 
@@ -66,12 +62,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String username = claims.getSubject();
             String role = claims.get("role", String.class);
 
-            System.out.println(
-                    "JWT valid. Subject: " + username
-                            + ", Role: " + role
-            );
+            Number userIdClaim =
+                    claims.get("userId", Number.class);
 
-            if (username != null && role != null) {
+            Long userId =
+                    userIdClaim != null
+                            ? userIdClaim.longValue()
+                            : null;
+
+            if (userId != null
+                    && username != null
+                    && role != null) {
+
+                AuthenticatedUser principal =
+                        new AuthenticatedUser(
+                                userId,
+                                username
+                        );
 
                 SimpleGrantedAuthority authority =
                         new SimpleGrantedAuthority(
@@ -80,7 +87,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                username,
+                                principal,
                                 null,
                                 List.of(authority)
                         );
@@ -88,11 +95,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder
                         .getContext()
                         .setAuthentication(authentication);
-
-                System.out.println(
-                        "Authentication set successfully for: "
-                                + username
-                );
             }
 
         } catch (Exception exception) {

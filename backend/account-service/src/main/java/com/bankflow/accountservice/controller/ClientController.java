@@ -40,6 +40,39 @@ public class ClientController {
         );
     }
 
+    /**
+     * Registers a client for someone at the counter, rather than for the
+     * caller.
+     */
+    @PostMapping("/for-user/{userId}")
+    public ResponseEntity<ClientResponse> createClientFor(
+            @PathVariable Long userId,
+            @Valid @RequestBody ClientCreateRequest request) {
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(clientService.createClientFor(userId, request));
+    }
+
+    /** Approves a client after their identity has been checked. */
+    @PostMapping("/{id}/activate")
+    public ResponseEntity<ClientResponse> activate(@PathVariable Long id) {
+        return ResponseEntity.ok(clientService.activate(id));
+    }
+
+    @PostMapping("/{id}/suspend")
+    public ResponseEntity<ClientResponse> suspend(@PathVariable Long id) {
+        return ResponseEntity.ok(clientService.suspend(id));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ClientResponse> getCurrentClient() {
+
+        return ResponseEntity.ok(
+                clientService.getCurrentClient()
+        );
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ClientResponse> getClientById(
             @PathVariable Long id) {

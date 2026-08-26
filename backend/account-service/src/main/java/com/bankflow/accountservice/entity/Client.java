@@ -12,6 +12,9 @@ public abstract class Client {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, unique = true)
+    private Long userId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ClientType clientType;
@@ -32,12 +35,34 @@ public abstract class Client {
     public Client() {
     }
 
+    /**
+     * How this client is named on a payment.
+     *
+     * Polymorphic rather than an {@code instanceof} check at the call site:
+     * accounts hold their client lazily, and a lazy proxy is of the base type,
+     * so {@code instanceof IndividualClient} would be false even for an
+     * individual. A method call goes through the proxy to the real instance.
+     */
+    public abstract String getDisplayName();
+
+    public boolean isActive() {
+        return ClientStatus.ACTIVE.name().equals(status);
+    }
+
     public Long getId() {
         return id;
     }
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public ClientType getClientType() {

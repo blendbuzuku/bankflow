@@ -54,6 +54,15 @@ public class Account {
     @Column(nullable = false, length = 20)
     private AccountStatus status;
 
+    /**
+     * What the account is for, when a client holds more than one of the same
+     * product in the same currency — "Bills", "Rent". Null for the single
+     * account most clients have, and the thing that makes a second one a
+     * deliberate act rather than a duplicate nobody can tell apart.
+     */
+    @Column(length = 60)
+    private String purpose;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
@@ -64,6 +73,19 @@ public class Account {
     private LocalDateTime updatedAt;
 
     public Account() {
+    }
+
+    public String getPurpose() {
+        return purpose;
+    }
+
+    public void setPurpose(String purpose) {
+        this.purpose = purpose;
+    }
+
+    /** A closed account is history: it holds nothing and takes no payments. */
+    public boolean isOpen() {
+        return status != AccountStatus.CLOSED;
     }
 
     public Long getId() {

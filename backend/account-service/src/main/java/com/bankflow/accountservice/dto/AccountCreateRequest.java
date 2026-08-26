@@ -3,6 +3,7 @@ package com.bankflow.accountservice.dto;
 import com.bankflow.accountservice.entity.AccountType;
 import com.bankflow.accountservice.entity.Currency;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 public class AccountCreateRequest {
 
@@ -14,6 +15,13 @@ public class AccountCreateRequest {
 
     @NotNull(message = "Currency is required")
     private Currency currency;
+
+    /**
+     * Optional. Required only to open a second account of the same type and
+     * currency for a client, where it is what tells the two apart.
+     */
+    @Size(max = 60, message = "Purpose must be 60 characters or fewer")
+    private String purpose;
 
     public AccountCreateRequest() {
     }
@@ -40,5 +48,13 @@ public class AccountCreateRequest {
 
     public void setCurrency(Currency currency) {
         this.currency = currency;
+    }
+
+    public String getPurpose() {
+        return purpose;
+    }
+
+    public void setPurpose(String purpose) {
+        this.purpose = purpose;
     }
 }

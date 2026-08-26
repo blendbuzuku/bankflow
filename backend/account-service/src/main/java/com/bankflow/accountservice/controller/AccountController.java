@@ -2,6 +2,8 @@ package com.bankflow.accountservice.controller;
 
 import com.bankflow.accountservice.dto.AccountCreateRequest;
 import com.bankflow.accountservice.dto.AccountResponse;
+import com.bankflow.accountservice.entity.AccountType;
+import com.bankflow.accountservice.entity.Currency;
 import com.bankflow.accountservice.service.AccountService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -38,6 +40,41 @@ public class AccountController {
         );
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<List<AccountResponse>> getCurrentUserAccounts() {
+
+        return ResponseEntity.ok(
+                accountService.getCurrentUserAccounts()
+        );
+    }
+
+    /**
+     * Accounts belonging to a given user, for ownership checks by other
+     * services.
+     */
+    @GetMapping("/by-user/{userId}")
+    public ResponseEntity<List<AccountResponse>> getAccountsForUser(
+            @PathVariable Long userId) {
+
+        return ResponseEntity.ok(
+                accountService.getAccountsForUser(userId)
+        );
+    }
+
+    /**
+     * The bank's own suspense and income accounts, resolved by type and
+     * currency rather than by ID so callers need no seeded identifiers.
+     */
+    @GetMapping("/internal/{accountType}/{currency}")
+    public ResponseEntity<AccountResponse> getInternalAccount(
+            @PathVariable AccountType accountType,
+            @PathVariable Currency currency) {
+
+        return ResponseEntity.ok(
+                accountService.getInternalAccount(accountType, currency)
+        );
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<AccountResponse> getAccountById(
             @PathVariable Long id) {
@@ -63,6 +100,14 @@ public class AccountController {
         return ResponseEntity.ok(
                 accountService.getAccountsByClientId(clientId)
         );
+    }
+
+    /**
+     * Ends an account's life. Not a delete — the payments behind it stay.
+     */
+    @PostMapping("/{id}/close")
+    public ResponseEntity<AccountResponse> closeAccount(@PathVariable Long id) {
+        return ResponseEntity.ok(accountService.closeAccount(id));
     }
 
     @PatchMapping("/{id}/balance")

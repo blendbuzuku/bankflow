@@ -1,6 +1,7 @@
 package com.bankflow.accountservice.config;
 
 import com.bankflow.accountservice.security.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,8 +10,10 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -61,6 +64,14 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth ->
                         auth
+                                /*
+                                 * The container's /error re-dispatch carries no
+                                 * SecurityContext, so without this every 500 comes back
+                                 * as a misleading 401.
+                                 */
+                                .dispatcherTypeMatchers(DispatcherType.ERROR)
+                                .permitAll()
+
                                 .anyRequest()
                                 .authenticated()
                 )

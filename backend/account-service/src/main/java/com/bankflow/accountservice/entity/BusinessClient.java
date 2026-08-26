@@ -21,6 +21,11 @@ public class BusinessClient extends Client {
         setClientType(ClientType.BUSINESS);
     }
 
+    @Override
+    public String getDisplayName() {
+        return legalName;
+    }
+
     public String getLegalName() {
         return legalName;
     }
