@@ -1,0 +1,232 @@
+<div class="page">
+
+  @if (loading()) {
+    <p class="status">Loading your dashboard...</p>
+  } @else {
+
+    @if (errorMessage()) {
+      <div class="alert error">{{ errorMessage() }}</div>
+    }
+
+    @if (client(); as currentClient) {
+
+      @if (awaitingApproval()) {
+        <section class="card pending">
+          <h2>We're checking your details</h2>
+          <p>
+            Your profile has been sent to the branch. Once someone has confirmed
+            your identity, an account will be opened for you and you'll be able
+            to pay in and send money from here.
+          </p>
+        </section>
+      }
+
+      <section class="summary">
+        @for (total of totalsByCurrency(); track total.currency) {
+          <div class="card stat total">
+            <span class="label">Total {{ total.currency }}</span>
+            <strong class="value">{{ total.total | number: '1.2-2' }}</strong>
+          </div>
+        }
+
+        <div class="card stat">
+          <span class="label">Accounts</span>
+          <strong class="value">{{ accounts().length }}</strong>
+        </div>
+
+        <div class="card stat">
+          <span class="label">Client status</span>
+          <strong class="value">{{ currentClient.status }}</strong>
+        </div>
+      </section>
+
+      <section class="card block">
+        <div class="block-head">
+          <h2>Your accounts</h2>
+          @if (canBank() && limits()?.selfServiceEnabled) {
+            <button type="button" class="primary" (click)="toggleForm()">
+              @if (showForm()) { Close } @else { Send money }
+            </button>
+          }
+        </div>
+
+        @if (accounts().length === 0) {
+          <p class="empty">
+            @if (awaitingApproval()) {
+              An account will be opened once your profile is approved.
+            } @else {
+              You don't have any accounts yet. Ask the branch to open one.
+            }
+          </p>
+        } @else {
+          <div class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>IBAN</th><th>Type</th><th>Currency</th>
+                  <th class="numeric">Balance</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (account of accounts(); track account.id) {
+                  <tr>
+                    <td class="mono">{{ account.iban }}</td>
+                    <td>
+                      {{ account.accountType }}
+                      @if (account.purpose) {
+                        <span class="purpose">{{ account.purpose }}</span>
+                      }
+                    </td>
+                    <td>{{ account.currency }}</td>
+                    <td class="numeric">{{ account.balance | number: '1.2-2' }}</td>
+                    <td>
+                      <span class="badge" [class.active]="account.status === 'ACTIVE'">
+                        {{ account.status }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      @if (showForm()) {
+        <section class="card block">
+          <h2>Send money</h2>
+
+          @if (sendError()) { <div class="alert error">{{ sendError() }}</div> }
+          @if (sendSuccess()) { <div class="alert ok">{{ sendSuccess() }}</div> }
+
+          <form class="send-form" (ngSubmit)="send()">
+
+            <div class="row">
+              <div class="field">
+                <label for="rail">Send by</label>
+                <select id="rail" name="rail" [(ngModel)]="paymentType">
+                  @for (r of availableRails(); track r.code) {
+                    <option [value]="r.code">{{ r.label }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="field grow">
+                <label for="from">From</label>
+                <select id="from" name="from" [(ngModel)]="sourceAccountId">
+                  <option [ngValue]="null">Choose an account</option>
+                  @for (a of accounts(); track a.id) {
+                    <option [ngValue]="a.id">
+                      {{ a.iban }} — {{ a.currency }} ({{ a.balance | number: '1.2-2' }})
+                    </option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            @if (isExternal()) {
+              <div class="field">
+                <label for="cname">Who are you paying?</label>
+                <input id="cname" name="cname" [(ngModel)]="creditorName" maxlength="70"
+                       placeholder="Their full name" />
+              </div>
+
+              <div class="row">
+                <div class="field grow">
+                  <label for="ciban">Their IBAN</label>
+                  <input id="ciban" name="ciban" [(ngModel)]="creditorIban" maxlength="34"
+                         placeholder="XK051501006000012345" />
+                </div>
+                <div class="field">
+                  <label for="cbic">Their bank BIC</label>
+                  <input id="cbic" name="cbic" [(ngModel)]="creditorAgentBic" maxlength="11"
+                         placeholder="TEBKXKPR" />
+                </div>
+              </div>
+            } @else {
+              <div class="field">
+                <label for="to">To</label>
+                <select id="to" name="to" [(ngModel)]="destinationAccountId">
+                  <option [ngValue]="null">Choose an account</option>
+                  @for (a of accounts(); track a.id) {
+                    <option [ngValue]="a.id">{{ a.iban }} — {{ a.currency }}</option>
+                  }
+                </select>
+              </div>
+            }
+
+            <div class="row">
+              <div class="field">
+                <label for="amt">Amount</label>
+                <input id="amt" name="amt" type="number" step="0.01" min="0.01"
+                       [(ngModel)]="amount" placeholder="0.00" />
+                @if (limitFor(selectedCurrency()); as cap) {
+                  <p class="hint">
+                    Up to {{ cap | number: '1.2-2' }} {{ selectedCurrency() }} online.
+                    Larger payments need a branch visit.
+                  </p>
+                }
+              </div>
+
+              <div class="field grow">
+                <label for="ref">Reference</label>
+                <input id="ref" name="ref" [(ngModel)]="remittanceInformation" maxlength="140"
+                       placeholder="What is this for?" />
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="primary" [disabled]="!canSend() || sending()">
+                @if (sending()) { Sending... } @else { Send payment }
+              </button>
+            </div>
+          </form>
+        </section>
+      }
+
+      <section class="card block">
+        <h2>Recent activity</h2>
+
+        @if (history().length === 0) {
+          <p class="empty">Nothing has moved through your accounts yet.</p>
+        } @else {
+          <ul class="activity">
+            @for (t of history(); track t.transactionReference) {
+              <li>
+                <div class="direction" [class.out]="isOutgoing(t)">
+                  @if (isOutgoing(t)) { &minus; } @else { + }
+                </div>
+
+                <div class="who">
+                  <strong>{{ counterparty(t) }}</strong>
+                  <span class="sub">
+                    {{ t.createdAt | date: 'dd MMM HH:mm' }}
+                    @if (t.remittanceInformation) { · {{ t.remittanceInformation }} }
+                  </span>
+                </div>
+
+                <div class="figures">
+                  <span class="money" [class.out]="isOutgoing(t)">
+                    {{ t.amount | number: '1.2-2' }} {{ t.currency }}
+                  </span>
+                  @if (t.debtorFeeAmount && isOutgoing(t)) {
+                    <span class="fee">fee {{ t.debtorFeeAmount | number: '1.2-2' }}</span>
+                  }
+                </div>
+
+                <span class="badge-status" [class]="statusTone(t.status)">{{ t.status }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+    } @else if (!errorMessage()) {
+
+      <section class="card block">
+        <app-onboarding (created)="onClientCreated($event)" />
+      </section>
+
+    }
+  }
+</div>

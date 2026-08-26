@@ -1,0 +1,178 @@
+<div class="page">
+
+  @if (loading()) {
+    <p class="status">Loading...</p>
+  } @else if (error()) {
+    <div class="alert error">{{ error() }}</div>
+  } @else if (transaction(); as t) {
+
+    <header class="page-head">
+      <div class="head-main">
+        <span class="ref">{{ t.transactionReference }}</span>
+        <h1>{{ t.amount | number: '1.2-2' }} {{ t.currency }}</h1>
+      </div>
+      <span class="status-pill" [class]="statusTone(t.status)">{{ t.status }}</span>
+    </header>
+
+    @if (t.rejectionReason) {
+      <div class="alert error">
+        {{ t.rejectionReason }}@if (t.reasonCode) { <span class="code">{{ t.reasonCode }}</span> }
+      </div>
+    }
+
+    <div class="grid">
+
+      <section class="card">
+        <h2>Instruction</h2>
+        <dl class="facts">
+          <div><dt>Rail</dt><dd>{{ t.paymentTypeName ?? t.paymentType }}</dd></div>
+          <div><dt>Direction</dt><dd>{{ t.direction }}</dd></div>
+          @if (t.serviceLevel) { <div><dt>Service level</dt><dd>{{ t.serviceLevel }}</dd></div> }
+          <div><dt>Charges</dt><dd>{{ t.chargeBearer }}</dd></div>
+          @if (t.purposeCode) { <div><dt>Purpose</dt><dd>{{ t.purposeCode }}</dd></div> }
+          <div><dt>End-to-end id</dt><dd class="mono">{{ t.endToEndId }}</dd></div>
+          @if (t.uetr) { <div><dt>UETR</dt><dd class="mono">{{ t.uetr }}</dd></div> }
+          <div><dt>Value date</dt><dd>{{ t.valueDate }}</dd></div>
+          @if (t.remittanceInformation) {
+            <div class="wide"><dt>Remittance</dt><dd>{{ t.remittanceInformation }}</dd></div>
+          }
+        </dl>
+      </section>
+
+      <section class="card">
+        <h2>Parties</h2>
+        <dl class="facts">
+          <div class="wide"><dt>Debtor</dt><dd>{{ t.debtorName ?? '—' }}</dd></div>
+          @if (t.debtorIban) { <div class="wide"><dt>From</dt><dd class="mono">{{ t.debtorIban }}</dd></div> }
+          <div class="wide"><dt>Creditor</dt><dd>{{ t.creditorName ?? '—' }}</dd></div>
+          @if (t.creditorIban) { <div class="wide"><dt>To</dt><dd class="mono">{{ t.creditorIban }}</dd></div> }
+          @if (t.creditorAgentBic) { <div><dt>Their bank</dt><dd class="mono">{{ t.creditorAgentBic }}</dd></div> }
+        </dl>
+      </section>
+
+      <section class="card">
+        <h2>Money</h2>
+        <dl class="facts">
+          <div><dt>Amount</dt><dd class="lead">{{ t.amount | number: '1.2-2' }} {{ t.currency }}</dd></div>
+          <div><dt>Charge</dt><dd>{{ (t.feeAmount ?? 0) | number: '1.2-2' }}</dd></div>
+          <div><dt>Paid by debtor</dt><dd>{{ (t.debtorFeeAmount ?? 0) | number: '1.2-2' }}</dd></div>
+          <div><dt>Total debited</dt><dd class="lead">{{ totalDebited() | number: '1.2-2' }}</dd></div>
+        </dl>
+      </section>
+
+      <section class="card">
+        <h2>Handling</h2>
+        <dl class="facts">
+          <div><dt>Raised by</dt><dd>{{ t.createdByUsername ?? '—' }}</dd></div>
+          <div><dt>Approved by</dt><dd>{{ t.approvedByUsername ?? 'Not required' }}</dd></div>
+          @if (t.approvedAt) {
+            <div><dt>Approved at</dt><dd>{{ t.approvedAt | date: 'dd MMM HH:mm' }}</dd></div>
+          }
+          <div><dt>Created</dt><dd>{{ t.createdAt | date: 'dd MMM HH:mm' }}</dd></div>
+        </dl>
+      </section>
+
+    </div>
+
+    @if (awaitingCounterparty()) {
+      <section class="card wide-card counterparty">
+        <h2>Awaiting the counterparty</h2>
+        <p class="explain">
+          The debtor has been debited and the pacs.008 has gone to KIPS. The money
+          is held in suspense until the receiving bank answers with a pacs.002.
+          There is no live KIPS link here, so you can play that answer yourself —
+          it is built as a real message and fed through the same inbound path a
+          genuine one would take.
+        </p>
+
+        @if (simulateError()) { <div class="alert error">{{ simulateError() }}</div> }
+
+        <div class="sim">
+          <button type="button" class="accept" (click)="simulate('ACSC')"
+                  [disabled]="simulating()">
+            Accept (ACSC)
+          </button>
+
+          <span class="sim-or">or</span>
+
+          <select name="reason" [(ngModel)]="selectedReason">
+            @for (r of rejectionReasons; track r.code) {
+              <option [value]="r.code">{{ r.label }}</option>
+            }
+          </select>
+
+          <button type="button" class="reject" (click)="simulate('RJCT')"
+                  [disabled]="simulating()">
+            Reject (RJCT)
+          </button>
+        </div>
+      </section>
+    }
+
+    <section class="card wide-card">
+      <h2>What happened</h2>
+
+      @if (audit().length === 0) {
+        <p class="empty">No events recorded.</p>
+      } @else {
+        <ol class="timeline">
+          @for (e of audit(); track e.id) {
+            <li [class]="eventTone(e.eventType)">
+              <div class="dot"></div>
+              <div class="event">
+                <div class="event-head">
+                  <span class="event-type">{{ e.eventType }}</span>
+                  <span class="event-when">{{ e.occurredAt | date: 'dd MMM HH:mm:ss' }}</span>
+                </div>
+                <p class="event-summary">{{ e.summary }}</p>
+                @if (e.actorUsername) {
+                  <p class="event-actor">{{ e.actorUsername }}
+                    @if (e.actorRole) { <span class="role">{{ e.actorRole }}</span> }
+                  </p>
+                }
+              </div>
+            </li>
+          }
+        </ol>
+      }
+    </section>
+
+    <section class="card wide-card">
+      <h2>Scheme messages</h2>
+
+      @if (messages().length === 0) {
+        <p class="empty">
+          No ISO 20022 messages. On-us payments settle on our own books and never reach KIPS.
+        </p>
+      } @else {
+        <div class="messages">
+          @for (m of messages(); track m.messageId) {
+            <div class="message">
+              <button type="button" class="message-head" (click)="toggleMessage(m)">
+                <span class="msg-type">{{ m.messageType }}</span>
+                <span class="msg-id mono">{{ m.messageId }}</span>
+                <span class="msg-dir">{{ m.direction }}</span>
+                @if (m.statusCode) { <span class="msg-status">{{ m.statusCode }}</span> }
+                @if (m.reasonCode) { <span class="msg-reason">{{ m.reasonCode }}</span> }
+                <span class="msg-toggle">
+                  @if (openMessageId() === m.messageId) { Hide } @else { View XML }
+                </span>
+              </button>
+
+              @if (openMessageId() === m.messageId) {
+                @if (xmlError()) {
+                  <div class="alert error">{{ xmlError() }}</div>
+                } @else if (messageXml()) {
+                  <pre class="xml">{{ messageXml() }}</pre>
+                } @else {
+                  <p class="empty">Loading...</p>
+                }
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+  }
+</div>

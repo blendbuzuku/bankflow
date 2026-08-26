@@ -1,0 +1,190 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(25, 118, 210, 0.16),
+      transparent 35%
+    ),
+    #f5f7fb;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 40px;
+
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+
+  box-shadow:
+    0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 42px;
+}
+
+.brand-icon {
+  width: 46px;
+  height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 12px;
+
+  background: #1565c0;
+  color: white;
+
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 21px;
+  color: #0f172a;
+}
+
+.brand span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.welcome {
+  margin-bottom: 28px;
+}
+
+.welcome h2 {
+  margin: 0 0 8px;
+
+  color: #0f172a;
+  font-size: 28px;
+}
+
+.welcome p {
+  margin: 0;
+  color: #64748b;
+}
+
+.field {
+  margin-bottom: 20px;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 7px;
+
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.field input {
+  box-sizing: border-box;
+
+  width: 100%;
+  height: 48px;
+
+  padding: 0 14px;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+
+  outline: none;
+
+  font-size: 14px;
+
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.field input:focus {
+  border-color: #1976d2;
+
+  box-shadow:
+    0 0 0 3px rgba(25, 118, 210, 0.12);
+}
+
+button {
+  width: 100%;
+  height: 48px;
+
+  border: 0;
+  border-radius: 10px;
+
+  background: #1565c0;
+  color: white;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s,
+    transform 0.1s;
+}
+
+button:hover:not(:disabled) {
+  background: #0d47a1;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.error {
+  margin-bottom: 18px;
+  padding: 11px 13px;
+
+  border-radius: 8px;
+
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+
+  color: #b91c1c;
+
+  font-size: 13px;
+}
+
+.register-link {
+  margin-top: 26px;
+
+  text-align: center;
+
+  color: #64748b;
+  font-size: 14px;
+}
+
+.register-link a {
+  color: #1565c0;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.register-link a:hover {
+  text-decoration: underline;
+}

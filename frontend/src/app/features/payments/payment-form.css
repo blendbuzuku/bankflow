@@ -1,0 +1,264 @@
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.page-head {
+  margin-bottom: 24px;
+}
+
+.page-head h1 {
+  margin: 0 0 6px;
+  font-size: 26px;
+  color: #0f172a;
+}
+
+.page-head p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 20px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.group h2,
+.card h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.row .field {
+  flex: 1 1 160px;
+}
+
+.row .field.grow {
+  flex: 3 1 260px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.req {
+  font-weight: 500;
+  font-size: 11px;
+  color: #b45309;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.field input,
+.field select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: #1565c0;
+  box-shadow: 0 0 0 3px rgba(21, 101, 192, .12);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid #f1f5f9;
+}
+
+button {
+  height: 42px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 9px;
+  background: #1565c0;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+button:hover:not(:disabled) {
+  background: #0d47a1;
+}
+
+button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: #eef2f8;
+  color: #1e3a5f;
+  border: 1px solid #d9e1ec;
+}
+
+button.secondary:hover {
+  background: #e2e8f0;
+}
+
+.alert {
+  padding: 11px 13px;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.alert.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.figures {
+  margin: 14px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.figures > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.figures dt {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.figures dd {
+  margin: 0;
+  font-size: 14px;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.figures dd.lead {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1565c0;
+}
+
+.rule {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eef2f8;
+  color: #475569;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.ok {
+  margin: 12px 0 10px;
+  font-size: 13px;
+  color: #15803d;
+}
+
+.empty {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.xml {
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  padding: 14px;
+  border-radius: 9px;
+  background: #0f172a;
+  color: #cbd5e1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre;
+}

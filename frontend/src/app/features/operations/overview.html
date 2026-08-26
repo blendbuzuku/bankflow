@@ -1,0 +1,127 @@
+<div class="page">
+
+  <header class="page-head">
+    <h1>Good day, {{ who() }}</h1>
+    <p>Here is what needs attention.</p>
+  </header>
+
+  <div class="tiles">
+
+    <a class="tile" routerLink="/approvals" [class.attention]="pending().length > 0">
+      <span class="tile-label">Awaiting approval</span>
+      <strong class="tile-value">{{ pending().length }}</strong>
+      @if (pending().length > 0) {
+        <span class="tile-sub">{{ pendingTotal() | number: '1.2-2' }} held</span>
+      } @else {
+        <span class="tile-sub">Nothing waiting</span>
+      }
+    </a>
+
+    <a class="tile" routerLink="/clients"
+       [class.attention]="awaitingApproval().length > 0">
+      <span class="tile-label">Clients to approve</span>
+      <strong class="tile-value">{{ awaitingApproval().length }}</strong>
+      <span class="tile-sub">{{ activeClients() }} approved</span>
+    </a>
+
+    @if (canSeeBooks()) {
+      <a class="tile" routerLink="/end-of-day" [class]="booksTone()">
+        <span class="tile-label">The books</span>
+        <strong class="tile-value">
+          @if (booksTone() === 'good') { Balanced }
+          @else if (booksTone() === 'bad') { Check }
+          @else { — }
+        </strong>
+        <span class="tile-sub">
+          @if (dayStatus(); as d) {
+            @if (d.currencies.length > 0) {
+              net {{ d.currencies[0].net | number: '1.2-2' }} {{ d.currencies[0].currency }}
+            } @else { nothing posted today }
+          } @else { end of day }
+        </span>
+      </a>
+    }
+
+  </div>
+
+  <div class="grid">
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Waiting for a second approver</h2>
+        <a class="more" routerLink="/approvals">Open queue</a>
+      </div>
+
+      @if (loading()) {
+        <p class="empty">Loading...</p>
+      } @else if (pending().length === 0) {
+        <p class="empty">Nothing is waiting for approval.</p>
+      } @else {
+        <ul class="rows">
+          @for (t of pending(); track t.transactionReference) {
+            <li>
+              <div class="row-main">
+                <strong>{{ t.amount | number: '1.2-2' }} {{ t.currency }}</strong>
+                <span class="sub">
+                  to {{ t.creditorName ?? t.creditorIban ?? 'an internal account' }}
+                  · raised by {{ t.createdByUsername }}
+                </span>
+              </div>
+              <a class="link" [routerLink]="['/payments', t.transactionReference]">View</a>
+            </li>
+          }
+        </ul>
+        @if (!canApprove()) {
+          <p class="note">You can see these but only operations may approve them.</p>
+        }
+      }
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Clients awaiting checks</h2>
+        <a class="more" routerLink="/clients">Open clients</a>
+      </div>
+
+      @if (awaitingApproval().length === 0) {
+        <p class="empty">Every client has been checked.</p>
+      } @else {
+        <ul class="rows">
+          @for (c of awaitingApproval(); track c.id) {
+            <li>
+              <div class="row-main">
+                <strong>{{ clientName(c) }}</strong>
+                <span class="sub">{{ c.email }} · {{ c.clientType }}</span>
+              </div>
+              <span class="pill warn">PENDING</span>
+            </li>
+          }
+        </ul>
+        <p class="note">
+          No account can be opened for a client until they are approved.
+        </p>
+      }
+    </section>
+
+  </div>
+
+  <section class="card actions-card">
+    <h2>Common tasks</h2>
+    <div class="actions">
+      <a class="action" routerLink="/clients">
+        <strong>Open an account</strong>
+        <span>Register a client, approve them, open accounts, take cash</span>
+      </a>
+      <a class="action" routerLink="/payments/new">
+        <strong>Make a payment</strong>
+        <span>Price it, preview the scheme message, send it</span>
+      </a>
+      @if (canSeeBooks()) {
+        <a class="action" routerLink="/end-of-day">
+          <strong>Close the day</strong>
+          <span>Prove the books balance and match what moved</span>
+        </a>
+      }
+    </div>
+  </section>
+</div>

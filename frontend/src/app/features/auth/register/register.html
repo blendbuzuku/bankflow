@@ -1,0 +1,98 @@
+<div class="register-page">
+
+  <div class="register-card">
+
+    <div class="brand">
+      <h1>BankFlow</h1>
+      <p>Create your account</p>
+    </div>
+
+    <form (ngSubmit)="register()">
+
+      <div class="form-group">
+        <label for="username">Username</label>
+
+        <input
+          id="username"
+          type="text"
+          name="username"
+          [(ngModel)]="username"
+          placeholder="Enter your username"
+          required
+          maxlength="50"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+
+        <input
+          id="email"
+          type="email"
+          name="email"
+          [(ngModel)]="email"
+          placeholder="Enter your email"
+          required
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+
+        <input
+          id="password"
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          placeholder="At least 8 characters"
+          required
+          minlength="8"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="confirmPassword">Confirm Password</label>
+
+        <input
+          id="confirmPassword"
+          type="password"
+          name="confirmPassword"
+          [(ngModel)]="confirmPassword"
+          placeholder="Confirm your password"
+          required
+        />
+      </div>
+
+      @if (errorMessage) {
+        <div class="error-message">
+          {{ errorMessage }}
+        </div>
+      }
+
+      @if (successMessage) {
+        <div class="success-message">
+          {{ successMessage }}
+        </div>
+      }
+
+      <button
+        type="submit"
+        [disabled]="loading"
+      >
+        @if (loading) {
+          Creating account...
+        } @else {
+          Create Account
+        }
+      </button>
+
+    </form>
+
+    <div class="login-link">
+      Already have an account?
+      <a routerLink="/login">Sign in</a>
+    </div>
+
+  </div>
+
+</div>

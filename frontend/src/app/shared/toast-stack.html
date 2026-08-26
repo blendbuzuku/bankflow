@@ -1,0 +1,24 @@
+@if (toasts().length) {
+  <div class="stack" aria-live="polite">
+    @for (t of toasts(); track t.id) {
+      <div class="toast" [class]="t.kind" [attr.role]="liveRole(t.kind)">
+
+        <span class="mark" aria-hidden="true">
+          @switch (t.kind) {
+            @case ('success') { &#10003; }
+            @case ('error') { &#33; }
+            @default { &#8226; }
+          }
+        </span>
+
+        <div class="body">
+          <strong>{{ t.title }}</strong>
+          @if (t.detail) { <span class="detail">{{ t.detail }}</span> }
+        </div>
+
+        <button type="button" class="close" (click)="dismiss(t.id)"
+                aria-label="Dismiss">&#215;</button>
+      </div>
+    }
+  </div>
+}

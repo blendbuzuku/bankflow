@@ -1,0 +1,112 @@
+.stack {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 1000;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  width: min(380px, calc(100vw - 36px));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+
+  padding: 13px 14px;
+  border-radius: 11px;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #94a3b8;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .16);
+
+  pointer-events: auto;
+  animation: slide-in .18s ease-out;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* A confirmation that flies in is charming once and tiring by the fiftieth. */
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+
+.toast.success { border-left-color: #15803d; }
+.toast.error   { border-left-color: #b91c1c; }
+.toast.info    { border-left-color: #1565c0; }
+
+.mark {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+
+  display: grid;
+  place-items: center;
+
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #94a3b8;
+}
+
+.toast.success .mark { background: #15803d; }
+.toast.error .mark   { background: #b91c1c; }
+.toast.info .mark    { background: #1565c0; }
+
+.body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.body strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.4;
+}
+
+.detail {
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.close {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+
+  font-size: 18px;
+  line-height: 1;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.close:focus-visible {
+  outline: 2px solid #1565c0;
+  outline-offset: 1px;
+}

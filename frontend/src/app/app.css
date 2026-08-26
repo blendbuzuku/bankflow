@@ -1,0 +1,165 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(21, 101, 192, .14), transparent 34%),
+    #f4f6fa;
+}
+
+.topbar {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.bar-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.brand-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #1565c0;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.brand-text strong {
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.brand-text small {
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+
+.nav a:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.nav a.active {
+  background: #e7f0fb;
+  color: #1565c0;
+  font-weight: 600;
+}
+
+.badge {
+  min-width: 19px;
+  height: 19px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #b45309;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.who {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.role {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+
+.signout {
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.signout:hover {
+  background: #f1f5f9;
+}
+
+@media (max-width: 720px) {
+  .bar-inner {
+    height: auto;
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .nav {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+  }
+}

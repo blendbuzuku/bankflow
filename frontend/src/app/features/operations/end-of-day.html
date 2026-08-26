@@ -1,0 +1,144 @@
+<div class="page">
+
+  <header class="page-head">
+    <div>
+      <h1>End of day</h1>
+      <p>The books must net to zero in every currency, and the ledger must match what actually moved.</p>
+    </div>
+
+    <div class="controls">
+      <input type="date" name="date" [(ngModel)]="date" (ngModelChange)="load()" />
+      <button type="button" class="primary" (click)="close()" [disabled]="closing()">
+        @if (closing()) { Closing... } @else { Close day }
+      </button>
+    </div>
+  </header>
+
+  @if (error()) { <div class="alert error">{{ error() }}</div> }
+
+  @if (closeResult()) {
+    <div class="alert" [class.ok]="isClean()" [class.warn]="!isClean()">{{ closeResult() }}</div>
+  }
+
+  @if (loading()) {
+    <p class="status">Loading...</p>
+  } @else {
+
+    <div class="verdict card" [class.good]="isClean()" [class.bad]="!isClean()">
+      <span class="verdict-label">
+        @if (isClean()) { Books balance and reconcile } @else { Attention required }
+      </span>
+      <span class="verdict-sub">
+        @if (isClean()) {
+          Debits equal credits, and every movement is accounted for.
+        } @else {
+          One of the two proofs did not pass. Details below.
+        }
+      </span>
+    </div>
+
+    <div class="grid">
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Trial balance</h2>
+          @if (trialBalance(); as tb) {
+            <span class="pill" [class.good]="tb.balanced" [class.bad]="!tb.balanced">
+              @if (tb.balanced) { Balanced } @else { Out of balance }
+            </span>
+          }
+        </div>
+        <p class="explain">Does the ledger add up? Proved separately per currency.</p>
+
+        @if (trialBalance(); as tb) {
+          @if (tb.currencies.length === 0) {
+            <p class="empty">Nothing was posted on this day.</p>
+          } @else {
+            <div class="scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Currency</th>
+                    <th class="numeric">Debits</th>
+                    <th class="numeric">Credits</th>
+                    <th class="numeric">Net</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (c of tb.currencies; track c.currency) {
+                    <tr [class.broken]="!c.balanced">
+                      <td>{{ c.currency }}</td>
+                      <td class="numeric">{{ c.totalDebits | number: '1.2-2' }}</td>
+                      <td class="numeric">{{ c.totalCredits | number: '1.2-2' }}</td>
+                      <td class="numeric strong">{{ c.net | number: '1.2-2' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        }
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Reconciliation</h2>
+          @if (reconciliation(); as r) {
+            <span class="pill" [class.good]="r.reconciled" [class.bad]="!r.reconciled">
+              @if (r.reconciled) { Reconciled } @else { {{ r.breakCount }} break(s) }
+            </span>
+          }
+        </div>
+        <p class="explain">
+          Does the ledger match what actually moved? A trial balance cannot see a
+          movement that never reached the ledger — both its sides would be missing,
+          and it would still net to zero.
+        </p>
+
+        @if (reconciliation(); as r) {
+          <dl class="figures">
+            <div><dt>Matched</dt><dd>{{ r.matched }}</dd></div>
+            <div><dt>Breaks</dt><dd [class.bad-text]="r.breakCount > 0">{{ r.breakCount }}</dd></div>
+            <div><dt>Unverifiable</dt><dd>{{ r.unverifiable }}</dd></div>
+          </dl>
+        } @else {
+          <p class="empty">Reconciliation could not be loaded.</p>
+        }
+      </section>
+
+    </div>
+
+    @if (allBreaks().length > 0) {
+      <section class="card">
+        <h2>Breaks</h2>
+        <p class="explain">Each names the exact movement, not just a wrong total.</p>
+
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Kind</th><th>Operation</th><th>Account</th>
+                <th class="numeric">Ledger</th><th class="numeric">Actual</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (b of allBreaks(); track b.item.operationId) {
+                <tr class="broken">
+                  <td>{{ b.kind }}</td>
+                  <td class="mono">{{ b.item.operationId }}</td>
+                  <td>{{ b.item.accountId ?? '—' }} {{ b.item.direction }}</td>
+                  <td class="numeric">
+                    @if (b.item.ledgerAmount !== null) { {{ b.item.ledgerAmount | number: '1.2-2' }} } @else { — }
+                  </td>
+                  <td class="numeric">
+                    @if (b.item.actualAmount !== null) { {{ b.item.actualAmount | number: '1.2-2' }} } @else { — }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+</div>

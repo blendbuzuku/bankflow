@@ -1,0 +1,206 @@
+<div class="page">
+
+  <header class="page-head">
+    <h1>New payment</h1>
+    <p>Enter the instruction, check the charge, and review the scheme message before it is sent.</p>
+  </header>
+
+  <div class="layout">
+
+    <form class="card form" (ngSubmit)="submit()">
+
+      <section class="group">
+        <h2>Rail</h2>
+
+        <div class="field">
+          <label for="rail">Payment type</label>
+          <select id="rail" name="rail" [(ngModel)]="paymentType" (ngModelChange)="onRailChange()">
+            @for (r of rails; track r.code) {
+              <option [value]="r.code">{{ r.label }}</option>
+            }
+          </select>
+          <p class="hint">{{ rail().hint }}</p>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="chargeBearer">Charges</label>
+            <select id="chargeBearer" name="chargeBearer" [(ngModel)]="chargeBearer" (ngModelChange)="onAmountChange()">
+              @for (cb of rail().chargeBearers; track cb) {
+                <option [value]="cb">{{ cb }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="currency">Currency</label>
+            <select id="currency" name="currency" [(ngModel)]="currency" (ngModelChange)="onAmountChange()">
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+              <option value="GBP">GBP</option>
+              <option value="CHF">CHF</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Debtor</h2>
+
+        <div class="field">
+          <label for="source">Account to debit</label>
+          @if (loadingAccounts()) {
+            <p class="hint">Loading accounts...</p>
+          } @else {
+            <select id="source" name="source" [(ngModel)]="sourceAccountId" required>
+              <option [ngValue]="null">Select an account</option>
+              @for (a of selectableAccounts(); track a.id) {
+                <option [ngValue]="a.id">
+                  {{ a.iban }} — {{ a.accountType }} {{ a.currency }} ({{ a.balance | number: '1.2-2' }})
+                </option>
+              }
+            </select>
+          }
+        </div>
+
+        <div class="field">
+          <label for="debtorName">Debtor name</label>
+          <input id="debtorName" name="debtorName" [(ngModel)]="debtorName" maxlength="70"
+                 placeholder="Name on the paying account" />
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Creditor</h2>
+
+        @if (isExternal()) {
+          <div class="field">
+            <label for="creditorName">Beneficiary name <span class="req">required</span></label>
+            <input id="creditorName" name="creditorName" [(ngModel)]="creditorName" maxlength="70"
+                   placeholder="Who is being paid" />
+          </div>
+
+          <div class="row">
+            <div class="field grow">
+              <label for="creditorIban">Beneficiary IBAN <span class="req">required</span></label>
+              <input id="creditorIban" name="creditorIban" [(ngModel)]="creditorIban" maxlength="34"
+                     placeholder="XK051501006000012345" />
+            </div>
+
+            <div class="field">
+              <label for="creditorAgentBic">Bank BIC <span class="req">required</span></label>
+              <input id="creditorAgentBic" name="creditorAgentBic" [(ngModel)]="creditorAgentBic"
+                     maxlength="11" placeholder="TEBKXKPR" />
+            </div>
+          </div>
+        } @else {
+          <div class="field">
+            <label for="destination">Account to credit</label>
+            <select id="destination" name="destination" [(ngModel)]="destinationAccountId">
+              <option [ngValue]="null">Select an account</option>
+              @for (a of selectableAccounts(); track a.id) {
+                <option [ngValue]="a.id">
+                  {{ a.iban }} — {{ a.accountType }} {{ a.currency }}
+                </option>
+              }
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="creditorNameInt">Beneficiary name</label>
+            <input id="creditorNameInt" name="creditorNameInt" [(ngModel)]="creditorName" maxlength="70" />
+          </div>
+        }
+      </section>
+
+      <section class="group">
+        <h2>Amount and details</h2>
+
+        <div class="row">
+          <div class="field">
+            <label for="amount">Amount</label>
+            <input id="amount" name="amount" type="number" step="0.01" min="0.01"
+                   [(ngModel)]="amount" (ngModelChange)="onAmountChange()" placeholder="0.00" />
+          </div>
+
+          <div class="field">
+            <label for="purpose">Purpose</label>
+            <select id="purpose" name="purpose" [(ngModel)]="purposeCode">
+              <option value="">Not stated</option>
+              @for (p of purposeCodes; track p) {
+                <option [value]="p">{{ p }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="remittance">Remittance information</label>
+          <input id="remittance" name="remittance" [(ngModel)]="remittanceInformation" maxlength="140"
+                 placeholder="Reference the beneficiary will see" />
+          <p class="hint">{{ remittanceInformation.length }} / 140</p>
+        </div>
+      </section>
+
+      @if (submitError()) {
+        <div class="alert error">{{ submitError() }}</div>
+      }
+
+      <div class="actions">
+        <button type="button" class="secondary" (click)="getQuote()">Check charge</button>
+
+        @if (isExternal()) {
+          <button type="button" class="secondary" (click)="preview()">Preview message</button>
+        }
+
+        <button type="submit" [disabled]="!canSubmit() || submitting()">
+          @if (submitting()) { Sending... } @else { Make payment }
+        </button>
+      </div>
+    </form>
+
+    <aside class="side">
+
+      <div class="card">
+        <h2>Charge</h2>
+
+        @if (quoteError()) {
+          <div class="alert error">{{ quoteError() }}</div>
+        }
+
+        @if (quote(); as fee) {
+          <dl class="figures">
+            <div><dt>Total charge</dt><dd class="lead">{{ fee.totalFee | number: '1.2-2' }} {{ fee.currency }}</dd></div>
+            <div><dt>Paid by debtor</dt><dd>{{ fee.debtorFee | number: '1.2-2' }}</dd></div>
+            <div><dt>Deducted from beneficiary</dt><dd>{{ fee.creditorFee | number: '1.2-2' }}</dd></div>
+            @if (amount) {
+              <div><dt>Total debited</dt><dd class="lead">{{ (amount + fee.debtorFee) | number: '1.2-2' }} {{ fee.currency }}</dd></div>
+              <div><dt>Beneficiary receives</dt><dd>{{ (amount - fee.creditorFee) | number: '1.2-2' }}</dd></div>
+            }
+          </dl>
+          <p class="rule">{{ fee.description }}@if (fee.ruleCode) { <span class="tag">{{ fee.ruleCode }}</span> }</p>
+        } @else if (!quoteError()) {
+          <p class="empty">Enter an amount and check the charge.</p>
+        }
+      </div>
+
+      @if (isExternal()) {
+        <div class="card">
+          <h2>Scheme message</h2>
+
+          @if (previewError()) {
+            <div class="alert error">{{ previewError() }}</div>
+          }
+
+          @if (previewXml()) {
+            <p class="ok">Valid against the KIPS schema.</p>
+            <pre class="xml">{{ previewXml() }}</pre>
+          } @else if (!previewError()) {
+            <p class="empty">Preview the pacs.008 that would be sent.</p>
+          }
+        </div>
+      }
+
+    </aside>
+  </div>
+</div>

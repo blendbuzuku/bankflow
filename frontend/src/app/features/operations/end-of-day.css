@@ -1,0 +1,241 @@
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.page-head h1 {
+  margin: 0 0 6px;
+  font-size: 26px;
+  color: #0f172a;
+}
+
+.page-head p {
+  margin: 0;
+  max-width: 56ch;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.controls input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.controls input:focus {
+  border-color: #1565c0;
+  box-shadow: 0 0 0 3px rgba(21, 101, 192, .12);
+}
+
+button.primary {
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 9px;
+  background: #1565c0;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+button.primary:hover:not(:disabled) { background: #0d47a1; }
+button.primary:disabled { opacity: .55; cursor: not-allowed; }
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 20px 22px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, .05);
+  margin-bottom: 14px;
+}
+
+.verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-left: 4px solid #94a3b8;
+}
+
+.verdict.good { border-left-color: #15803d; }
+.verdict.bad  { border-left-color: #b91c1c; }
+
+.verdict-label {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.verdict.good .verdict-label { color: #15803d; }
+.verdict.bad  .verdict-label { color: #b91c1c; }
+
+.verdict-sub {
+  font-size: 13.5px;
+  color: #64748b;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.grid .card {
+  margin-bottom: 0;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.card h2,
+.card-head h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.explain {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.pill {
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pill.good { background: #dcfce7; color: #15803d; }
+.pill.bad  { background: #fee2e2; color: #b91c1c; }
+
+.scroll { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+thead th {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  text-align: left;
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 10px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #0f172a;
+}
+
+tbody tr:last-child td { border-bottom: 0; }
+
+tr.broken td {
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.strong { font-weight: 700; }
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.figures {
+  margin: 0;
+  display: flex;
+  gap: 26px;
+  flex-wrap: wrap;
+}
+
+.figures > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.figures dt {
+  font-size: 11px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.figures dd {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.figures dd.bad-text { color: #b91c1c; }
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.status { color: #64748b; }
+
+.alert {
+  margin-bottom: 14px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+.alert.error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+.alert.ok    { background: #dcfce7; border: 1px solid #bbf7d0; color: #15803d; }
+.alert.warn  { background: #fef3c7; border: 1px solid #fde68a; color: #b45309; }

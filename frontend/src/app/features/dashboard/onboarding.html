@@ -1,0 +1,80 @@
+<div class="onboarding">
+
+  <h2>Register as a client</h2>
+  <p class="lead">
+    Your sign-in account is ready. To hold money you also need a client record —
+    this is what accounts are opened against.
+  </p>
+
+  @if (error()) { <div class="alert error">{{ error() }}</div> }
+
+  <form (ngSubmit)="submit()">
+
+    <div class="field">
+      <label for="ctype">You are</label>
+      <select id="ctype" name="ctype" [(ngModel)]="clientType">
+        <option value="INDIVIDUAL">An individual</option>
+        <option value="BUSINESS">A business</option>
+      </select>
+    </div>
+
+    @if (isBusiness()) {
+      <div class="field">
+        <label for="legalName">Legal name</label>
+        <input id="legalName" name="legalName" [(ngModel)]="legalName"
+               placeholder="Registered company name" />
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="regNo">Registration number</label>
+          <input id="regNo" name="regNo" [(ngModel)]="registrationNumber"
+                 placeholder="Company registration" />
+        </div>
+        <div class="field">
+          <label for="taxNo">Tax number</label>
+          <input id="taxNo" name="taxNo" [(ngModel)]="taxNumber" placeholder="Optional" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="industry">Industry</label>
+        <input id="industry" name="industry" [(ngModel)]="industry" placeholder="Optional" />
+      </div>
+    } @else {
+      <div class="row">
+        <div class="field">
+          <label for="firstName">First name</label>
+          <input id="firstName" name="firstName" [(ngModel)]="firstName" maxlength="50" />
+        </div>
+        <div class="field">
+          <label for="lastName">Last name</label>
+          <input id="lastName" name="lastName" [(ngModel)]="lastName" maxlength="50" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="dob">Date of birth</label>
+        <input id="dob" name="dob" type="date" [(ngModel)]="dateOfBirth" />
+      </div>
+    }
+
+    <div class="row">
+      <div class="field grow">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" [(ngModel)]="email"
+               placeholder="you@example.com" />
+      </div>
+      <div class="field">
+        <label for="phone">Phone</label>
+        <input id="phone" name="phone" [(ngModel)]="phone" placeholder="Optional" />
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="submit" [disabled]="!canSubmit() || saving()">
+        @if (saving()) { Saving... } @else { Create my client profile }
+      </button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,46 @@
+@if (showChrome()) {
+  <header class="topbar">
+    <div class="bar-inner">
+
+      <a class="brand" routerLink="/">
+        <span class="brand-icon">B</span>
+        <span class="brand-text">
+          <strong>BankFlow</strong>
+          <small>Digital Banking Platform</small>
+        </span>
+      </a>
+
+      <nav class="nav">
+        @if (isStaff()) {
+          <a routerLink="/overview" routerLinkActive="active">Overview</a>
+          <a routerLink="/clients" routerLinkActive="active">Clients</a>
+          <a routerLink="/payments/new" routerLinkActive="active">New payment</a>
+          <a routerLink="/approvals" routerLinkActive="active">
+            Approvals
+            @if (pendingCount() > 0) { <span class="badge">{{ pendingCount() }}</span> }
+          </a>
+          @if (canApprove()) {
+            <a routerLink="/end-of-day" routerLinkActive="active">End of day</a>
+          }
+        } @else {
+          <a routerLink="/dashboard" routerLinkActive="active">My banking</a>
+        }
+      </nav>
+
+      <div class="account">
+        @if (user(); as u) {
+          <span class="who">{{ u.username }}</span>
+          <span class="role">{{ u.role }}</span>
+        }
+        <button type="button" class="signout" (click)="logout()">Sign out</button>
+      </div>
+
+    </div>
+  </header>
+}
+
+<main [class.with-chrome]="showChrome()">
+  <router-outlet />
+</main>
+
+<app-toast-stack />

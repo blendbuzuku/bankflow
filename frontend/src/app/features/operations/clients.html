@@ -1,0 +1,200 @@
+<div class="page">
+
+  <header class="page-head">
+    <h1>Clients and accounts</h1>
+    <p>Open accounts and handle cash over the counter.</p>
+  </header>
+
+  @if (error()) { <div class="alert error">{{ error() }}</div> }
+  @if (notice()) { <div class="alert ok">{{ notice() }}</div> }
+
+  <div class="grid">
+
+    <section class="card">
+      <h2>Open an account</h2>
+
+      <div class="field">
+        <label for="oc">Client</label>
+        <select id="oc" name="oc" [(ngModel)]="newAccountClientId">
+          <option [ngValue]="null">Choose a client</option>
+          @for (c of approvedClients(); track c.id) {
+            <option [ngValue]="c.id">{{ clientName(c) }} — {{ c.email }}</option>
+          }
+        </select>
+        @if (approvedClients().length === 0) {
+          <p class="hint">
+            No approved clients yet. A client must be checked and approved below
+            before an account can be opened for them.
+          </p>
+        }
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="ot">Type</label>
+          <select id="ot" name="ot" [(ngModel)]="newAccountType">
+            <option value="CURRENT">Current</option>
+            <option value="SAVINGS">Savings</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="ocur">Currency</label>
+          <select id="ocur" name="ocur" [(ngModel)]="newAccountCurrency">
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+            <option value="GBP">GBP</option>
+            <option value="CHF">CHF</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="opurp">Purpose <span class="optional">optional</span></label>
+        <input id="opurp" name="opurp" maxlength="60"
+               [(ngModel)]="newAccountPurpose"
+               placeholder="Bills, Rent — needed for a second account" />
+        <p class="hint">
+          A client may hold more than one account of the same type and currency
+          only when each says what it is for.
+        </p>
+      </div>
+
+      <button type="button" class="primary" (click)="openAccount()"
+              [disabled]="!newAccountClientId || busy()">
+        Open account
+      </button>
+    </section>
+
+    <section class="card">
+      <h2>Cash</h2>
+      <p class="explain">
+        Booked as a real transaction against the suspense account, not a balance
+        adjustment.
+      </p>
+
+      <div class="field">
+        <label for="ca">Account</label>
+        <select id="ca" name="ca" [(ngModel)]="cashAccountId">
+          <option [ngValue]="null">Choose an account</option>
+          @for (a of customerAccounts(); track a.id) {
+            <option [ngValue]="a.id">
+              {{ a.iban }} — {{ a.currency }} ({{ a.balance | number: '1.2-2' }})
+            </option>
+          }
+        </select>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="cam">Amount</label>
+          <input id="cam" name="cam" type="number" step="0.01" min="0.01"
+                 [(ngModel)]="cashAmount" placeholder="0.00" />
+        </div>
+        <div class="field grow">
+          <label for="cn">Narrative</label>
+          <input id="cn" name="cn" [(ngModel)]="cashNarrative" placeholder="Optional" />
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="primary" (click)="cash('deposit')"
+                [disabled]="!cashAccountId || !cashAmount || busy()">
+          Pay in
+        </button>
+        <button type="button" class="secondary" (click)="cash('withdraw')"
+                [disabled]="!cashAccountId || !cashAmount || busy()">
+          Pay out
+        </button>
+      </div>
+    </section>
+
+  </div>
+
+  <section class="card">
+    <h2>Clients</h2>
+
+    @if (loading()) {
+      <p class="status">Loading...</p>
+    } @else if (clients().length === 0) {
+      <p class="empty">No clients yet.</p>
+    } @else {
+      @for (c of clients(); track c.id) {
+        <div class="client">
+          <div class="client-head">
+            <strong>{{ clientName(c) }}</strong>
+            <span class="chip">{{ c.clientType }}</span>
+            <span class="pill" [class]="statusTone(c.status)">{{ c.status }}</span>
+            <span class="email">{{ c.email }}</span>
+
+            @if (isPending(c)) {
+              <button type="button" class="approve" (click)="activate(c)"
+                      [disabled]="busy()">
+                Approve client
+              </button>
+            }
+          </div>
+
+          @if (isPending(c)) {
+            <p class="pending-note">
+              Identity not yet checked. No account can be opened until this
+              client is approved.
+            </p>
+          }
+
+          @if (accountsOf(c.id).length === 0) {
+            <p class="empty small">No open accounts.</p>
+          } @else {
+            <ul class="accounts">
+              @for (a of accountsOf(c.id); track a.id) {
+                <li [class.closed]="isClosed(a)">
+                  <span class="mono">{{ a.iban }}</span>
+                  <span class="chip quiet">{{ a.accountType }}</span>
+
+                  @if (a.purpose) {
+                    <span class="purpose">{{ a.purpose }}</span>
+                  }
+
+                  @if (isClosed(a)) {
+                    <span class="chip closed-chip">CLOSED</span>
+                  }
+
+                  <span class="bal">{{ a.balance | number: '1.2-2' }} {{ a.currency }}</span>
+
+                  @if (canClose(a)) {
+                    <button type="button" class="close-account" (click)="close(a)"
+                            [disabled]="busy()">
+                      Close
+                    </button>
+                  }
+                </li>
+              }
+            </ul>
+          }
+
+          @if (closedAccountsOf(c.id).length; as closedCount) {
+            <button type="button" class="show-closed" (click)="toggleClosed(c.id)">
+              @if (isShowingClosed(c.id)) { Hide } @else { Show }
+              {{ closedCount }} closed
+            </button>
+
+            @if (isShowingClosed(c.id)) {
+              <ul class="accounts closed-list">
+                @for (a of closedAccountsOf(c.id); track a.id) {
+                  <li class="closed">
+                    <span class="mono">{{ a.iban }}</span>
+                    <span class="chip quiet">{{ a.accountType }}</span>
+                    @if (a.purpose) {
+                      <span class="purpose">{{ a.purpose }}</span>
+                    }
+                    <span class="chip closed-chip">CLOSED</span>
+                    <span class="bal">{{ a.balance | number: '1.2-2' }} {{ a.currency }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          }
+        </div>
+      }
+    }
+  </section>
+</div>

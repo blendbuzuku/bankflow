@@ -1,0 +1,81 @@
+<div class="page">
+
+  <header class="page-head">
+    <h1>Awaiting approval</h1>
+    <p>Payments at or above the approval threshold. Nothing has been booked and no message has been sent.</p>
+  </header>
+
+  @if (error()) {
+    <div class="alert error">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <p class="status">Loading...</p>
+  } @else if (pending().length === 0) {
+    <div class="card empty-state">
+      <p>Nothing is waiting for approval.</p>
+    </div>
+  } @else {
+
+    <div class="queue">
+      @for (t of pending(); track t.transactionReference) {
+        <article class="card item">
+
+          <div class="item-main">
+            <div class="amount">
+              {{ t.amount | number: '1.2-2' }} <span class="ccy">{{ t.currency }}</span>
+            </div>
+
+            <div class="meta">
+              <a class="ref" [routerLink]="['/payments', t.transactionReference]">
+                {{ t.transactionReference }}
+              </a>
+              <span class="chip">{{ t.paymentTypeName ?? t.paymentType }}</span>
+              @if (t.chargeBearer) { <span class="chip quiet">{{ t.chargeBearer }}</span> }
+            </div>
+
+            <dl class="details">
+              <div><dt>To</dt><dd>{{ beneficiary(t) }}</dd></div>
+              @if (t.creditorIban) {
+                <div><dt>IBAN</dt><dd class="mono">{{ t.creditorIban }}</dd></div>
+              }
+              <div><dt>Raised by</dt><dd>{{ t.createdByUsername ?? 'unknown' }}</dd></div>
+              <div><dt>At</dt><dd>{{ t.createdAt | date: 'dd MMM HH:mm' }}</dd></div>
+              @if (t.remittanceInformation) {
+                <div><dt>Reference</dt><dd>{{ t.remittanceInformation }}</dd></div>
+              }
+            </dl>
+          </div>
+
+          <div class="item-actions">
+            @if (!canApprove()) {
+              <p class="note">Only operations may approve.</p>
+            } @else if (isOwnPayment(t)) {
+              <p class="note">You raised this payment, so you cannot approve it.</p>
+            } @else if (declining() === t.transactionReference) {
+              <div class="decline-box">
+                <label [for]="'reason-' + t.id">Reason</label>
+                <input [id]="'reason-' + t.id" name="reason" [(ngModel)]="declineReason"
+                       placeholder="Why is this being declined?" />
+                <div class="btn-row">
+                  <button type="button" class="danger" (click)="confirmDecline(t)"
+                          [disabled]="busy() === t.transactionReference">
+                    Confirm decline
+                  </button>
+                  <button type="button" class="secondary" (click)="cancelDecline()">Cancel</button>
+                </div>
+              </div>
+            } @else {
+              <button type="button" (click)="approve(t)"
+                      [disabled]="busy() === t.transactionReference">
+                @if (busy() === t.transactionReference) { Working... } @else { Approve }
+              </button>
+              <button type="button" class="secondary" (click)="startDecline(t)">Decline</button>
+            }
+          </div>
+
+        </article>
+      }
+    </div>
+  }
+</div>
