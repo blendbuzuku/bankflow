@@ -1,5 +1,10 @@
 package com.bankflow.transactionservice.dto;
 
+import com.bankflow.transactionservice.entity.ChargeBearer;
+import com.bankflow.transactionservice.entity.PaymentDirection;
+import com.bankflow.transactionservice.entity.PaymentType;
+import com.bankflow.transactionservice.entity.PurposeCode;
+import com.bankflow.transactionservice.entity.ServiceLevel;
 import com.bankflow.transactionservice.entity.Transaction;
 import com.bankflow.transactionservice.entity.TransactionStatus;
 import com.bankflow.transactionservice.entity.TransactionType;
@@ -8,130 +13,112 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-public class TransactionResponse {
+/**
+ * A payment as the outside world sees it.
+ *
+ * Carries the classification and party details as well as the amounts, because
+ * a screen showing a payment for approval has to say what kind of payment it is
+ * and who it is going to — an amount and a reference alone are not enough to
+ * decide on.
+ */
+public record TransactionResponse(
+        Long id,
+        String transactionReference,
+        String endToEndId,
+        String instructionId,
+        String uetr,
 
-    private Long id;
-    private String transactionReference;
-    private String endToEndId;
-    private String instructionId;
+        TransactionType transactionType,
+        PaymentType paymentType,
+        String paymentTypeCode,
+        String paymentTypeName,
+        PaymentDirection direction,
+        ServiceLevel serviceLevel,
+        ChargeBearer chargeBearer,
+        PurposeCode purposeCode,
+        TransactionStatus status,
 
-    private TransactionType transactionType;
-    private TransactionStatus status;
+        Long sourceAccountId,
+        Long destinationAccountId,
 
-    private Long sourceAccountId;
-    private Long destinationAccountId;
+        BigDecimal amount,
+        String currency,
 
-    private BigDecimal amount;
-    private String currency;
+        String debtorName,
+        String debtorIban,
+        String debtorAgentBic,
+        String creditorName,
+        String creditorIban,
+        String creditorAgentBic,
+        String remittanceInformation,
 
-    private LocalDate bookingDate;
-    private LocalDate valueDate;
+        BigDecimal feeAmount,
+        BigDecimal debtorFeeAmount,
+        BigDecimal creditorFeeAmount,
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+        String createdByUsername,
+        String approvedByUsername,
+        LocalDateTime approvedAt,
+        String rejectionReason,
+        String reasonCode,
 
-    public static TransactionResponse fromEntity(
-            Transaction transaction) {
+        LocalDate bookingDate,
+        LocalDate valueDate,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
+) {
 
-        TransactionResponse response =
-                new TransactionResponse();
+    public static TransactionResponse fromEntity(Transaction transaction) {
 
-        response.id = transaction.getId();
-        response.transactionReference =
-                transaction.getTransactionReference();
+        PaymentType paymentType = transaction.getPaymentType();
 
-        response.endToEndId =
-                transaction.getEndToEndId();
+        return new TransactionResponse(
+                transaction.getId(),
+                transaction.getTransactionReference(),
+                transaction.getEndToEndId(),
+                transaction.getInstructionId(),
+                transaction.getUetr(),
 
-        response.instructionId =
-                transaction.getInstructionId();
+                transaction.getTransactionType(),
+                paymentType,
+                paymentType == null ? null : paymentType.getCode(),
+                paymentType == null ? null : paymentType.getDisplayName(),
+                transaction.getDirection(),
+                transaction.getServiceLevel(),
+                transaction.getChargeBearer(),
+                transaction.getPurposeCode(),
+                transaction.getStatus(),
 
-        response.transactionType =
-                transaction.getTransactionType();
+                transaction.getSourceAccountId(),
+                transaction.getDestinationAccountId(),
 
-        response.status =
-                transaction.getStatus();
+                transaction.getAmount(),
+                transaction.getCurrency() == null
+                        ? null
+                        : transaction.getCurrency().name(),
 
-        response.sourceAccountId =
-                transaction.getSourceAccountId();
+                transaction.getDebtorName(),
+                transaction.getDebtorIban(),
+                transaction.getDebtorAgentBic(),
+                transaction.getCreditorName(),
+                transaction.getCreditorIban(),
+                transaction.getCreditorAgentBic(),
+                transaction.getRemittanceInformation(),
 
-        response.destinationAccountId =
-                transaction.getDestinationAccountId();
+                transaction.getFeeAmount(),
+                transaction.getDebtorFeeAmount(),
+                transaction.getCreditorFeeAmount(),
 
-        response.amount =
-                transaction.getAmount();
+                transaction.getCreatedByUsername(),
+                transaction.getApprovedByUsername(),
+                transaction.getApprovedAt(),
+                transaction.getRejectionReason(),
+                transaction.getReasonCode(),
 
-        response.currency =
-                transaction.getCurrency().name();
-
-        response.bookingDate =
-                transaction.getBookingDate();
-
-        response.valueDate =
-                transaction.getValueDate();
-
-        response.createdAt =
-                transaction.getCreatedAt();
-
-        response.updatedAt =
-                transaction.getUpdatedAt();
-
-        return response;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getTransactionReference() {
-        return transactionReference;
-    }
-
-    public String getEndToEndId() {
-        return endToEndId;
-    }
-
-    public String getInstructionId() {
-        return instructionId;
-    }
-
-    public TransactionType getTransactionType() {
-        return transactionType;
-    }
-
-    public TransactionStatus getStatus() {
-        return status;
-    }
-
-    public Long getSourceAccountId() {
-        return sourceAccountId;
-    }
-
-    public Long getDestinationAccountId() {
-        return destinationAccountId;
-    }
-
-    public BigDecimal getAmount() {
-        return amount;
-    }
-
-    public String getCurrency() {
-        return currency;
-    }
-
-    public LocalDate getBookingDate() {
-        return bookingDate;
-    }
-
-    public LocalDate getValueDate() {
-        return valueDate;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
+                transaction.getBookingDate(),
+                transaction.getValueDate(),
+                transaction.getCreatedAt(),
+                transaction.getUpdatedAt()
+        );
     }
 }

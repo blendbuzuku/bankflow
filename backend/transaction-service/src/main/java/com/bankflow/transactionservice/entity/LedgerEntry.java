@@ -64,6 +64,16 @@ public class LedgerEntry {
     private Long accountId;
 
     /**
+     * The balance operation this entry caused, in account-service.
+     *
+     * Without it the ledger and the real balances cannot be matched movement by
+     * movement — only compared in aggregate, which cannot say *which* movement
+     * is missing. This is the join key for reconciliation.
+     */
+    @Column(name = "operation_id", length = 100)
+    private String operationId;
+
+    /**
      * DEBIT or CREDIT.
      */
     @Enumerated(EnumType.STRING)
@@ -129,6 +139,14 @@ public class LedgerEntry {
 
     public String getEntryReference() {
         return entryReference;
+    }
+
+    public String getOperationId() {
+        return operationId;
+    }
+
+    public void setOperationId(String operationId) {
+        this.operationId = operationId;
     }
 
     public void setEntryReference(String entryReference) {

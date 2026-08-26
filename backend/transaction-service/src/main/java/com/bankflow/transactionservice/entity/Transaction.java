@@ -3,6 +3,7 @@ package com.bankflow.transactionservice.entity;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -15,6 +16,9 @@ import java.time.LocalDateTime;
         }
 )
 public class Transaction {
+
+    /** Currencies here carry two minor units. */
+    private static final int MONEY_SCALE = 2;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -57,6 +61,16 @@ public class Transaction {
     )
     private String instructionId;
 
+    /**
+     * Unique End-to-end Transaction Reference — a UUIDv4 that stays with an
+     * RTGS payment for its whole life, including any status report or return a
+     * counterparty sends back about it.
+     *
+     * Only RTGS carries one; ACH identifies transactions with TxId instead.
+     */
+    @Column(name = "uetr", length = 36)
+    private String uetr;
+
     @Enumerated(EnumType.STRING)
     @Column(
             name = "transaction_type",
@@ -64,6 +78,50 @@ public class Transaction {
             length = 20
     )
     private TransactionType transactionType;
+
+    /**
+     * The rail this payment travels on. Drives routing and price.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "payment_type",
+            nullable = false,
+            length = 30
+    )
+    private PaymentType paymentType;
+
+    /**
+     * Whether the payment stays inside the bank, leaves it, or arrives.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "direction",
+            nullable = false,
+            length = 10
+    )
+    private PaymentDirection direction;
+
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "service_level",
+            length = 10
+    )
+    private ServiceLevel serviceLevel;
+
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "charge_bearer",
+            nullable = false,
+            length = 10
+    )
+    private ChargeBearer chargeBearer;
+
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "purpose_code",
+            length = 10
+    )
+    private PurposeCode purposeCode;
 
     @Enumerated(EnumType.STRING)
     @Column(
@@ -79,22 +137,52 @@ public class Transaction {
      * We deliberately do not create a JPA relationship
      * because Account belongs to another microservice.
      */
-    @Column(
-            name = "source_account_id",
-            nullable = false
-    )
+    /**
+     * Debtor account, when we hold it.
+     *
+     * Null for inbound payments: the payer banks elsewhere and is identified by
+     * the debtor IBAN and agent BIC instead. Mirrors
+     * {@link #destinationAccountId}, which is null for outbound payments.
+     */
+    @Column(name = "source_account_id")
     private Long sourceAccountId;
 
     /**
-     * Destination account.
+     * Destination account, when we hold it.
      *
-     * Also owned by account-service.
+     * Null for outbound payments: an external creditor has an IBAN and an agent
+     * BIC, but no row in our database. The creditor party fields below carry
+     * that case.
      */
-    @Column(
-            name = "destination_account_id",
-            nullable = false
-    )
+    @Column(name = "destination_account_id")
     private Long destinationAccountId;
+
+    // --- ISO 20022 party block -------------------------------------------
+    // These are the fields a teller fills in and that a pacs.008 carries.
+
+    @Column(name = "debtor_name", length = 140)
+    private String debtorName;
+
+    @Column(name = "debtor_iban", length = 34)
+    private String debtorIban;
+
+    @Column(name = "debtor_agent_bic", length = 11)
+    private String debtorAgentBic;
+
+    @Column(name = "creditor_name", length = 140)
+    private String creditorName;
+
+    @Column(name = "creditor_iban", length = 34)
+    private String creditorIban;
+
+    @Column(name = "creditor_agent_bic", length = 11)
+    private String creditorAgentBic;
+
+    /**
+     * Unstructured remittance information. ISO caps this at 140 characters.
+     */
+    @Column(name = "remittance_information", length = 140)
+    private String remittanceInformation;
 
     @Column(
             nullable = false,
@@ -127,6 +215,58 @@ public class Transaction {
             nullable = false
     )
     private LocalDate valueDate;
+
+    // --- charges ----------------------------------------------------------
+
+    /**
+     * Total fee assessed for this payment, in {@link #currency}.
+     *
+     * Recorded here for reporting; the money itself moves through a separate
+     * FEE transaction so it appears as its own line on a statement.
+     */
+    @Column(name = "fee_amount", precision = 19, scale = 2)
+    private BigDecimal feeAmount;
+
+    /** Share of the fee charged to the debtor. */
+    @Column(name = "debtor_fee_amount", precision = 19, scale = 2)
+    private BigDecimal debtorFeeAmount;
+
+    /** Share deducted from what the creditor receives. */
+    @Column(name = "creditor_fee_amount", precision = 19, scale = 2)
+    private BigDecimal creditorFeeAmount;
+
+    /**
+     * For a FEE, REVERSAL or RETURN, the payment that caused it.
+     */
+    @Column(name = "parent_transaction_id")
+    private Long parentTransactionId;
+
+    // --- four-eyes trail ---------------------------------------------------
+
+    @Column(name = "created_by_user_id")
+    private Long createdByUserId;
+
+    @Column(name = "created_by_username", length = 50)
+    private String createdByUsername;
+
+    @Column(name = "approved_by_user_id")
+    private Long approvedByUserId;
+
+    @Column(name = "approved_by_username", length = 50)
+    private String approvedByUsername;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "rejection_reason", length = 255)
+    private String rejectionReason;
+
+    /**
+     * ISO 20022 reason code when a payment is rejected or returned,
+     * e.g. AC01 unknown account, AM04 insufficient funds.
+     */
+    @Column(name = "reason_code", length = 10)
+    private String reasonCode;
 
     @Column(
             name = "created_at",
@@ -205,8 +345,20 @@ public class Transaction {
         return amount;
     }
 
+    /**
+     * Normalises the scale as the amount comes in.
+     *
+     * A BigDecimal parsed from the JSON number {@code 2500} carries scale zero
+     * and renders as "2500" everywhere downstream — in the scheme message, the
+     * audit trail and the ledger. An interbank instruction stating an amount
+     * without its minor units reads as a rounding error, so the scale is fixed
+     * once here rather than formatted at each of the places that display it.
+     */
     public void setAmount(BigDecimal amount) {
-        this.amount = amount;
+
+        this.amount = amount == null
+                ? null
+                : amount.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 
     public Currency getCurrency() {
@@ -233,6 +385,198 @@ public class Transaction {
         this.valueDate = valueDate;
     }
 
+    public String getUetr() {
+        return uetr;
+    }
+
+    public void setUetr(String uetr) {
+        this.uetr = uetr;
+    }
+
+    public PaymentType getPaymentType() {
+        return paymentType;
+    }
+
+    public void setPaymentType(PaymentType paymentType) {
+        this.paymentType = paymentType;
+    }
+
+    public PaymentDirection getDirection() {
+        return direction;
+    }
+
+    public void setDirection(PaymentDirection direction) {
+        this.direction = direction;
+    }
+
+    public ServiceLevel getServiceLevel() {
+        return serviceLevel;
+    }
+
+    public void setServiceLevel(ServiceLevel serviceLevel) {
+        this.serviceLevel = serviceLevel;
+    }
+
+    public ChargeBearer getChargeBearer() {
+        return chargeBearer;
+    }
+
+    public void setChargeBearer(ChargeBearer chargeBearer) {
+        this.chargeBearer = chargeBearer;
+    }
+
+    public PurposeCode getPurposeCode() {
+        return purposeCode;
+    }
+
+    public void setPurposeCode(PurposeCode purposeCode) {
+        this.purposeCode = purposeCode;
+    }
+
+    public String getDebtorName() {
+        return debtorName;
+    }
+
+    public void setDebtorName(String debtorName) {
+        this.debtorName = debtorName;
+    }
+
+    public String getDebtorIban() {
+        return debtorIban;
+    }
+
+    public void setDebtorIban(String debtorIban) {
+        this.debtorIban = debtorIban;
+    }
+
+    public String getDebtorAgentBic() {
+        return debtorAgentBic;
+    }
+
+    public void setDebtorAgentBic(String debtorAgentBic) {
+        this.debtorAgentBic = debtorAgentBic;
+    }
+
+    public String getCreditorName() {
+        return creditorName;
+    }
+
+    public void setCreditorName(String creditorName) {
+        this.creditorName = creditorName;
+    }
+
+    public String getCreditorIban() {
+        return creditorIban;
+    }
+
+    public void setCreditorIban(String creditorIban) {
+        this.creditorIban = creditorIban;
+    }
+
+    public String getCreditorAgentBic() {
+        return creditorAgentBic;
+    }
+
+    public void setCreditorAgentBic(String creditorAgentBic) {
+        this.creditorAgentBic = creditorAgentBic;
+    }
+
+    public String getRemittanceInformation() {
+        return remittanceInformation;
+    }
+
+    public void setRemittanceInformation(String remittanceInformation) {
+        this.remittanceInformation = remittanceInformation;
+    }
+
+    public BigDecimal getFeeAmount() {
+        return feeAmount;
+    }
+
+    public void setFeeAmount(BigDecimal feeAmount) {
+        this.feeAmount = feeAmount;
+    }
+
+    public BigDecimal getDebtorFeeAmount() {
+        return debtorFeeAmount;
+    }
+
+    public void setDebtorFeeAmount(BigDecimal debtorFeeAmount) {
+        this.debtorFeeAmount = debtorFeeAmount;
+    }
+
+    public BigDecimal getCreditorFeeAmount() {
+        return creditorFeeAmount;
+    }
+
+    public void setCreditorFeeAmount(BigDecimal creditorFeeAmount) {
+        this.creditorFeeAmount = creditorFeeAmount;
+    }
+
+    public Long getParentTransactionId() {
+        return parentTransactionId;
+    }
+
+    public void setParentTransactionId(Long parentTransactionId) {
+        this.parentTransactionId = parentTransactionId;
+    }
+
+    public Long getCreatedByUserId() {
+        return createdByUserId;
+    }
+
+    public void setCreatedByUserId(Long createdByUserId) {
+        this.createdByUserId = createdByUserId;
+    }
+
+    public String getCreatedByUsername() {
+        return createdByUsername;
+    }
+
+    public void setCreatedByUsername(String createdByUsername) {
+        this.createdByUsername = createdByUsername;
+    }
+
+    public Long getApprovedByUserId() {
+        return approvedByUserId;
+    }
+
+    public void setApprovedByUserId(Long approvedByUserId) {
+        this.approvedByUserId = approvedByUserId;
+    }
+
+    public String getApprovedByUsername() {
+        return approvedByUsername;
+    }
+
+    public void setApprovedByUsername(String approvedByUsername) {
+        this.approvedByUsername = approvedByUsername;
+    }
+
+    public LocalDateTime getApprovedAt() {
+        return approvedAt;
+    }
+
+    public void setApprovedAt(LocalDateTime approvedAt) {
+        this.approvedAt = approvedAt;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
+    public String getReasonCode() {
+        return reasonCode;
+    }
+
+    public void setReasonCode(String reasonCode) {
+        this.reasonCode = reasonCode;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -249,6 +593,14 @@ public class Transaction {
 
         if (status == null) {
             status = TransactionStatus.PENDING;
+        }
+
+        if (chargeBearer == null) {
+            chargeBearer = ChargeBearer.DEBT;
+        }
+
+        if (serviceLevel == null && paymentType != null) {
+            serviceLevel = paymentType.getServiceLevel();
         }
 
         if (bookingDate == null) {
