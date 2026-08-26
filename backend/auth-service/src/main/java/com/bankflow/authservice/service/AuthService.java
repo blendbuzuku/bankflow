@@ -1,5 +1,6 @@
 package com.bankflow.authservice.service;
 
+import com.bankflow.authservice.entity.UserRole;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.bankflow.authservice.dto.RegisterRequest;
 import com.bankflow.authservice.dto.UserResponse;
@@ -53,7 +54,7 @@ public class AuthService {
                 passwordEncoder.encode(request.password())
         );
 
-        user.setRole(request.role());
+        user.setRole(UserRole.CUSTOMER);
         user.setStatus(UserStatus.ACTIVE);
 
         User savedUser = userRepository.save(user);
@@ -103,5 +104,15 @@ public class AuthService {
                 "Bearer",
                 3600000
         );
+    }
+
+    public UserResponse getCurrentUser(String username) {
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() ->
+                        new RuntimeException("User not found")
+                );
+
+        return mapToResponse(user);
     }
 }

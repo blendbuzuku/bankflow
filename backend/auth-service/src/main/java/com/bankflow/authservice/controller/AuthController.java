@@ -40,14 +40,11 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<String> getCurrentUser(
+    public ResponseEntity<UserResponse> getCurrentUser(
             Authentication authentication) {
 
         return ResponseEntity.ok(
-                "Authenticated as: "
-                        + authentication.getName()
-                        + " | Role: "
-                        + authentication.getAuthorities()
+                authService.getCurrentUser(authentication.getName())
         );
     }
 }
