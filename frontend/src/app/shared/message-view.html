@@ -9,6 +9,17 @@
     </button>
   </div>
 
+  @if (!showXml() && summary().length > 1) {
+    <dl class="summary">
+      @for (f of summary(); track f.label) {
+        <div>
+          <dt>{{ f.label }}</dt>
+          <dd>{{ f.value }}</dd>
+        </div>
+      }
+    </dl>
+  }
+
   @if (showXml()) {
     <pre class="xml">{{ xml() }}</pre>
   } @else if (parseError()) {

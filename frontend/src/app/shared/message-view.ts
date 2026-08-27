@@ -74,6 +74,258 @@ export class MessageView {
   readonly nodes = computed(() => this.parsed().nodes);
   readonly parseError = computed(() => this.parsed().error);
 
+  /**
+   * The handful of facts somebody actually wants first.
+   *
+   * A scheme message is a deep tree and the answer to "what is this?" is
+   * usually six values scattered through it. They are pulled out by element
+   * name rather than by path, because the same fact sits at a different depth
+   * in each definition — the amount is under the group header in one message
+   * and under the transaction in another.
+   */
+  readonly summary = computed<{ label: string; value: string }[]>(() => {
+
+    const flat: MessageNode[] = [];
+
+    const walk = (node: MessageNode) => {
+      flat.push(node);
+      node.children.forEach(walk);
+    };
+
+    this.nodes().forEach(walk);
+
+    const first = (...tags: string[]): MessageNode | undefined =>
+      flat.find(n => tags.includes(n.tag) && n.value !== null);
+
+    /*
+     * A statement answers different questions from a payment. Amount, payer
+     * and beneficiary are single values on a payment and simply do not exist
+     * on a statement, so it gets a reading of its own rather than a header
+     * with two lines in it.
+     */
+    const statement = this.nodes()[0]?.children[0];
+
+    if (statement?.tag === 'BkToCstmrStmt') {
+      return this.statementFacts(statement);
+    }
+
+    const facts: { label: string; value: string }[] = [];
+
+    const add = (label: string, node?: MessageNode, suffix?: string) => {
+
+      if (!node?.value) {
+        return;
+      }
+
+      const currency = node.attributes.find(a => a.name === 'Ccy')?.value;
+
+      facts.push({
+        label,
+        value: node.value
+          + (currency ? ' ' + currency : '')
+          + (suffix ? ' — ' + suffix : ''),
+      });
+    };
+
+    /*
+     * The body element is what the message is: the root is always Document,
+     * which says nothing.
+     */
+    const body = this.nodes()[0]?.children[0];
+
+    if (body) {
+      facts.push({ label: 'Message', value: body.label });
+    }
+
+    add('Amount', first(
+      'IntrBkSttlmAmt', 'RtrdIntrBkSttlmAmt',
+      'OrgnlIntrBkSttlmAmt', 'TtlIntrBkSttlmAmt'));
+
+    const status = first('TxSts');
+
+    if (status?.value) {
+      facts.push({
+        label: 'Status',
+        value: status.value + (status.meaning ? ' — ' + status.meaning : ''),
+      });
+    }
+
+    const reason = flat.find(n => n.tag === 'Cd'
+      && ['StsRsnInf', 'RtrRsnInf', 'CxlRsnInf'].some(
+        parent => flat.some(p => p.tag === parent
+          && p.children.some(c => c.children.includes(n)))));
+
+    if (reason?.value) {
+      facts.push({ label: 'Reason', value: reason.value });
+    }
+
+    add('Payer', flat.find(n => n.tag === 'Nm'
+      && this.isUnder(flat, n, 'Dbtr')));
+
+    add('Beneficiary', flat.find(n => n.tag === 'Nm'
+      && this.isUnder(flat, n, 'Cdtr')));
+
+    add('Reference', first('EndToEndId', 'OrgnlEndToEndId'));
+    add('Sent', first('CreDtTm'));
+
+    return facts;
+  });
+
+  /**
+   * What a statement is actually saying: whose account, over what period, and
+   * where the balance started and ended.
+   */
+  private statementFacts(body: MessageNode): { label: string; value: string }[] {
+
+    const stmt = this.descendant(body, 'Stmt') ?? body;
+    const facts: { label: string; value: string }[] = [];
+
+    facts.push({ label: 'Message', value: 'Account statement' });
+
+    const account = this.descendant(stmt, 'Acct');
+    const iban = this.descendant(account, 'IBAN');
+
+    if (iban?.value) {
+      facts.push({ label: 'Account', value: iban.value });
+    }
+
+    const owner = this.descendant(this.descendant(stmt, 'Ownr'), 'Nm');
+
+    if (owner?.value) {
+      facts.push({ label: 'Held by', value: owner.value });
+    }
+
+    const from = this.descendant(stmt, 'FrDtTm');
+    const to = this.descendant(stmt, 'ToDtTm');
+
+    if (from?.value && to?.value) {
+      facts.push({
+        label: 'Period',
+        value: `${this.day(from.value)} to ${this.day(to.value)}`,
+      });
+    }
+
+    /*
+     * Balances are told apart by their type code, not by their order, because
+     * the schema does not fix which comes first.
+     */
+    for (const balance of this.descendants(stmt, 'Bal')) {
+
+      const code = this.descendant(balance, 'Cd')?.value;
+      const amount = this.descendant(balance, 'Amt');
+
+      if (!amount?.value) {
+        continue;
+      }
+
+      const label = code === 'OPBD' ? 'Opening balance'
+        : code === 'CLBD' ? 'Closing balance'
+        : code ?? 'Balance';
+
+      facts.push({ label, value: this.signedMoney(balance, amount) });
+    }
+
+    const entries = this.descendant(stmt, 'NbOfNtries');
+
+    if (entries?.value) {
+      facts.push({ label: 'Entries', value: entries.value });
+    }
+
+    const credits = this.descendant(this.descendant(stmt, 'TtlCdtNtries'), 'Sum');
+    const debits = this.descendant(this.descendant(stmt, 'TtlDbtNtries'), 'Sum');
+
+    if (credits?.value) {
+      facts.push({ label: 'Paid in', value: credits.value });
+    }
+
+    if (debits?.value) {
+      facts.push({ label: 'Paid out', value: debits.value });
+    }
+
+    return facts;
+  }
+
+  /**
+   * A balance carries its sign in a separate indicator, so an overdrawn
+   * account is a positive number marked DBIT. Read back, that is a minus.
+   */
+  private signedMoney(balance: MessageNode, amount: MessageNode): string {
+
+    const currency = amount.attributes.find(a => a.name === 'Ccy')?.value;
+    const owed = this.descendant(balance, 'CdtDbtInd')?.value === 'DBIT';
+
+    return (owed ? '-' : '') + amount.value + (currency ? ' ' + currency : '');
+  }
+
+  /** The date half of an ISO date-time, which is all a period needs. */
+  private day(value: string): string {
+    return value.split('T')[0];
+  }
+
+  /** The first descendant with the given tag, the node itself included. */
+  private descendant(
+      node: MessageNode | undefined, tag: string): MessageNode | undefined {
+
+    if (!node) {
+      return undefined;
+    }
+
+    if (node.tag === tag) {
+      return node;
+    }
+
+    for (const child of node.children) {
+
+      const found = this.descendant(child, tag);
+
+      if (found) {
+        return found;
+      }
+    }
+
+    return undefined;
+  }
+
+  /** Every descendant with the given tag. */
+  private descendants(node: MessageNode, tag: string): MessageNode[] {
+
+    const found: MessageNode[] = [];
+
+    const walk = (current: MessageNode) => {
+
+      if (current.tag === tag) {
+        found.push(current);
+      }
+
+      current.children.forEach(walk);
+    };
+
+    walk(node);
+
+    return found;
+  }
+
+  /** Whether a node sits somewhere beneath an element with the given tag. */
+  private isUnder(
+      flat: MessageNode[], node: MessageNode, ancestorTag: string): boolean {
+
+    const parentOf = (child: MessageNode) =>
+      flat.find(candidate => candidate.children.includes(child));
+
+    let current: MessageNode | undefined = parentOf(node);
+
+    while (current) {
+
+      if (current.tag === ancestorTag) {
+        return true;
+      }
+
+      current = parentOf(current);
+    }
+
+    return false;
+  }
+
   toggle(): void {
     this.showXml.set(!this.showXml());
   }

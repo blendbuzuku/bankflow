@@ -1,0 +1,160 @@
+<div class="page">
+
+  <header class="page-head">
+    <h1>Messages</h1>
+    <p>
+      Everything exchanged with the scheme, in plain English. The XML stays the
+      record — this is the same document, read out.
+    </p>
+  </header>
+
+  <div class="split">
+
+    <aside class="card list-card">
+      <div class="list-head">
+        <h2>Find a message</h2>
+        <button type="button" class="link" (click)="startPaste()">Paste XML</button>
+      </div>
+
+      <input class="filter" name="query" [(ngModel)]="query"
+             (ngModelChange)="onQueryChanged()"
+             placeholder="IBAN, name, amount or reference" />
+
+      <p class="search-help">
+        Search what you know — an account number, who was paid, the amount, or a
+        payment reference.
+      </p>
+
+      <div class="field">
+        <label for="acc">Or pick an account</label>
+        <select id="acc" name="acc" (change)="searchAccount($any($event.target).value)">
+          <option value="">Choose an account…</option>
+          @for (a of accounts(); track a.id) {
+            <option [value]="a.iban">
+              {{ a.clientName }} · {{ a.iban }}
+            </option>
+          }
+        </select>
+      </div>
+
+      @if (types().length) {
+        <div class="filters">
+          <span class="filter-label">Message type</span>
+          <div class="chips">
+            @for (t of types(); track t.name) {
+              <button type="button" class="chip" [class.on]="typeFilter === t.name"
+                      (click)="chooseType(t.name)"
+                      [attr.title]="t.identifier + ' — ' + t.description">
+                <span class="chip-id">{{ t.identifier }}</span>
+                <span class="chip-what">{{ t.description }}</span>
+                <span class="chip-n">{{ t.count }}</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="filters">
+          <span class="filter-label">Direction</span>
+          <div class="chips">
+            <button type="button" class="chip small" [class.on]="directionFilter === 'OUTBOUND'"
+                    (click)="chooseDirection('OUTBOUND')">We sent it</button>
+            <button type="button" class="chip small" [class.on]="directionFilter === 'INBOUND'"
+                    (click)="chooseDirection('INBOUND')">We received it</button>
+          </div>
+        </div>
+      }
+
+      @if (hasFilters()) {
+        <button type="button" class="link clear" (click)="clearAll()">
+          Clear search and filters
+        </button>
+      }
+
+      @if (loading()) {
+        <p class="status">Loading...</p>
+      } @else if (messages().length === 0) {
+        <p class="empty">Nothing has been exchanged yet.</p>
+      } @else if (visible().length === 0) {
+        <p class="empty">
+          @if (lastSearch()) {
+            Nothing matches "{{ lastSearch() }}".
+          } @else {
+            No messages match those filters.
+          }
+        </p>
+      } @else {
+        <p class="count">
+          {{ visible().length }}
+          {{ visible().length === 1 ? 'message' : 'messages' }}
+        </p>
+        <ul class="messages">
+          @for (m of visible(); track m.messageId) {
+            <li>
+              <button type="button" class="entry" [class.on]="selected()?.messageId === m.messageId"
+                      (click)="open(m)">
+                <span class="top">
+                  <span class="type">{{ m.messageType }}</span>
+                  <span class="dir" [class]="tone(m)">{{ m.direction }}</span>
+                  @if (m.statusCode) { <span class="code">{{ m.statusCode }}</span> }
+                  @if (m.reasonCode) { <span class="code bad">{{ m.reasonCode }}</span> }
+                </span>
+                <span class="mid mono">{{ m.transactionReference ?? m.messageId }}</span>
+                <span class="when">{{ m.createdAt | date: 'dd MMM HH:mm:ss' }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </aside>
+
+    <section class="card detail-card">
+
+      @if (pasteMode()) {
+        <h2>Paste a message</h2>
+        <p class="explain">
+          Anything a counterparty sends you, read the same way. Nothing is
+          stored — this only reads what you paste.
+        </p>
+
+        <textarea class="paste" name="pasted" [(ngModel)]="pasted" rows="7"
+                  placeholder="<?xml version=&quot;1.0&quot;?> ..."></textarea>
+
+        <div class="btn-row">
+          <button type="button" class="primary" (click)="readPasted()"
+                  [disabled]="!pasted.trim()">Read it</button>
+          <button type="button" class="secondary" (click)="clearPasted()">Clear</button>
+        </div>
+
+        @if (xml()) {
+          <app-message-view [xml]="xml()" />
+        }
+
+      } @else if (selected(); as m) {
+
+        <div class="detail-head">
+          <div>
+            <h2>{{ m.description }}</h2>
+            <p class="ids">
+              <span class="mono">{{ m.messageId }}</span>
+              @if (m.transactionReference) {
+                · <a [routerLink]="['/payments', m.transactionReference]">
+                    {{ m.transactionReference }}
+                  </a>
+              }
+            </p>
+          </div>
+          <span class="dir" [class]="tone(m)">{{ m.direction }}</span>
+        </div>
+
+        @if (loadingXml()) {
+          <p class="status">Loading the message...</p>
+        } @else if (xml()) {
+          <app-message-view [xml]="xml()" />
+        }
+
+      } @else {
+        <p class="empty">Choose a message, or paste one.</p>
+      }
+    </section>
+  </div>
+</div>
