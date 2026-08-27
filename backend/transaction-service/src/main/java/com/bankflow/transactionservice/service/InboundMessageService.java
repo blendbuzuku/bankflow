@@ -46,6 +46,8 @@ public class InboundMessageService {
     private final LedgerPoster ledgerPoster;
     private final SuspenseAccountResolver suspenseAccounts;
     private final AuditService auditService;
+    private final PaymentReturnService paymentReturnService;
+    private final RecallService recallService;
 
     public InboundMessageService(
             PacsMessageParser parser,
@@ -58,7 +60,9 @@ public class InboundMessageService {
             AccountClient accountClient,
             LedgerPoster ledgerPoster,
             SuspenseAccountResolver suspenseAccounts,
-            AuditService auditService) {
+            AuditService auditService,
+            PaymentReturnService paymentReturnService,
+            RecallService recallService) {
 
         this.parser = parser;
         this.messageRepository = messageRepository;
@@ -71,6 +75,8 @@ public class InboundMessageService {
         this.ledgerPoster = ledgerPoster;
         this.suspenseAccounts = suspenseAccounts;
         this.auditService = auditService;
+        this.paymentReturnService = paymentReturnService;
+        this.recallService = recallService;
     }
 
     /**
@@ -102,14 +108,15 @@ public class InboundMessageService {
              * answered. A malformed one is recorded and dropped rather than
              * replied to, which would invite a loop.
              */
-            if (parsed.isStatusReport()) {
+            if (parsed.isAnswer()) {
 
                 auditService.record(
                         AuditEventType.PACS_MESSAGE_RECEIVED,
                         null,
                         "PacsMessage",
                         parsed.messageId(),
-                        "Discarded malformed pacs.002: fails schema validation",
+                        "Discarded malformed %s: fails schema validation"
+                                .formatted(parsed.messageType().getIdentifier()),
                         Map.of("messageId", String.valueOf(parsed.messageId()))
                 );
 
@@ -125,6 +132,20 @@ public class InboundMessageService {
 
         if (parsed.isStatusReport()) {
             handleStatusReport(parsed);
+            return "";
+        }
+
+        if (parsed.isReturn()) {
+            paymentReturnService.receiveReturn(parsed);
+            return "";
+        }
+
+        /*
+         * A recall is a question, and the answer is a person's to give. It is
+         * recorded for the queue rather than answered here.
+         */
+        if (parsed.isCancellationRequest()) {
+            recallService.receiveCancellationRequest(parsed);
             return "";
         }
 

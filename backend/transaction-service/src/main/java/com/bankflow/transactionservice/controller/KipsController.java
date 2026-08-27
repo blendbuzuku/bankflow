@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+
 /**
  * The KIPS participant interface.
  *
@@ -23,6 +25,7 @@ public class KipsController {
     private final TransactionRepository transactionRepository;
     private final PacsMessageRepository messageRepository;
     private final Pacs002Builder pacs002Builder;
+    private final Pacs004Builder pacs004Builder;
     private final MessageIdGenerator messageIdGenerator;
 
     public KipsController(
@@ -30,12 +33,14 @@ public class KipsController {
             TransactionRepository transactionRepository,
             PacsMessageRepository messageRepository,
             Pacs002Builder pacs002Builder,
+            Pacs004Builder pacs004Builder,
             MessageIdGenerator messageIdGenerator) {
 
         this.inboundMessageService = inboundMessageService;
         this.transactionRepository = transactionRepository;
         this.messageRepository = messageRepository;
         this.pacs002Builder = pacs002Builder;
+        this.pacs004Builder = pacs004Builder;
         this.messageIdGenerator = messageIdGenerator;
     }
 
@@ -112,5 +117,51 @@ public class KipsController {
         inboundMessageService.receive(pacs002);
 
         return ResponseEntity.ok(pacs002);
+    }
+
+    /**
+     * Simulates the beneficiary bank sending a settled payment back.
+     *
+     * Like the status simulation, this builds a genuine pacs.004 with the
+     * production builder and feeds it through the real inbound path, so what
+     * is exercised is the code that would run for an actual return rather than
+     * a shortcut around it.
+     *
+     * @param returnedAmount what actually comes back, which may be less than
+     *                       the original where the other bank kept charges.
+     *                       Defaults to the full amount.
+     */
+    @PreAuthorize("hasAnyRole('OPERATIONS', 'BANK_ADMIN')")
+    @PostMapping(
+            value = "/simulate/return/{transactionReference}",
+            produces = MediaType.APPLICATION_XML_VALUE
+    )
+    public ResponseEntity<String> simulateReturn(
+            @PathVariable String transactionReference,
+            @RequestParam(defaultValue = "AC04") ReasonCode reason,
+            @RequestParam(required = false) BigDecimal returnedAmount) {
+
+        Transaction transaction =
+                transactionRepository
+                        .findByTransactionReference(transactionReference)
+                        .orElseThrow(() -> new BusinessException(
+                                "Unknown payment: " + transactionReference
+                        ));
+
+        BigDecimal amount =
+                returnedAmount != null ? returnedAmount : transaction.getAmount();
+
+        String pacs004 = pacs004Builder.build(
+                messageIdGenerator.newMessageId(),
+                messageIdGenerator.newMessageId(),
+                transaction,
+                amount,
+                reason,
+                transaction.getPaymentType().schemaRail()
+        );
+
+        inboundMessageService.receive(pacs004);
+
+        return ResponseEntity.ok(pacs004);
     }
 }

@@ -27,6 +27,12 @@ public enum AuditEventType {
     PAYMENT_FAILED,
     PAYMENT_REVERSED,
 
+    /** A recall was asked for, agreed to, refused, or arrived from a peer. */
+    RECALL_REQUESTED,
+    RECALL_RECEIVED,
+    RECALL_ACCEPTED,
+    RECALL_REJECTED,
+
     PACS_MESSAGE_GENERATED,
     PACS_MESSAGE_RECEIVED,
 
