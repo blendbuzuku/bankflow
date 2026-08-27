@@ -41,7 +41,7 @@ public interface LedgerEntryRepository
      * @return rows of [currency, entryType, total]
      */
     @Query("""
-            SELECT e.currency, e.entryType, SUM(e.amount)
+            SELECT e.currency, e.entryType, SUM(e.amount), COUNT(e)
             FROM LedgerEntry e
             WHERE e.bookingDate = :bookingDate
             GROUP BY e.currency, e.entryType

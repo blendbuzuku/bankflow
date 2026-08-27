@@ -57,6 +57,7 @@ public class EndOfDayService {
             Currency currency = (Currency) row[0];
             LedgerEntryType type = (LedgerEntryType) row[1];
             BigDecimal total = (BigDecimal) row[2];
+            long entries = (Long) row[3];
 
             BigDecimal[] sides = totals.computeIfAbsent(
                     currency,
@@ -69,7 +70,12 @@ public class EndOfDayService {
                 sides[1] = sides[1].add(total);
             }
 
-            counts.merge(currency, 1L, Long::sum);
+            /*
+             * The rows are already grouped by currency and side, so counting
+             * them counts the groups — two per currency, however many entries
+             * are behind them. The count has to come from the query.
+             */
+            counts.merge(currency, entries, Long::sum);
         }
 
         List<TrialBalance.CurrencyBalance> lines = new ArrayList<>();
