@@ -138,9 +138,13 @@
                          placeholder="XK051501006000012345" />
                 </div>
                 <div class="field">
-                  <label for="cbic">Their bank BIC</label>
-                  <input id="cbic" name="cbic" [(ngModel)]="creditorAgentBic" maxlength="11"
-                         placeholder="TEBKXKPR" />
+                  <label for="cbic">Their bank</label>
+                  <select id="cbic" name="cbic" [(ngModel)]="creditorAgentBic">
+                    <option value="">Choose a bank</option>
+                    @for (b of banks(); track b.bic) {
+                      <option [value]="b.bic">{{ b.label }}</option>
+                    }
+                  </select>
                 </div>
               </div>
             } @else {

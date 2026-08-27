@@ -219,7 +219,7 @@
                 @if (m.statusCode) { <span class="msg-status">{{ m.statusCode }}</span> }
                 @if (m.reasonCode) { <span class="msg-reason">{{ m.reasonCode }}</span> }
                 <span class="msg-toggle">
-                  @if (openMessageId() === m.messageId) { Hide } @else { View XML }
+                  @if (openMessageId() === m.messageId) { Hide } @else { View }
                 </span>
               </button>
 
@@ -227,7 +227,7 @@
                 @if (xmlError()) {
                   <div class="alert error">{{ xmlError() }}</div>
                 } @else if (messageXml()) {
-                  <pre class="xml">{{ messageXml() }}</pre>
+                  <app-message-view [xml]="messageXml()" />
                 } @else {
                   <p class="empty">Loading...</p>
                 }

@@ -11,6 +11,7 @@ import { Statements } from './features/statements/statements';
 import { Overview } from './features/operations/overview';
 import { Clients } from './features/operations/clients';
 import { EndOfDay } from './features/operations/end-of-day';
+import { Banks } from './features/operations/banks';
 
 import { authGuard } from './core/guards/auth-guard';
 import {
@@ -83,6 +84,16 @@ export const routes: Routes = [
     path: 'recalls',
     component: RecallQueue,
     canActivate: [staffGuard],
+  },
+
+  /*
+   * An entry in the directory decides where money goes, so maintaining it sits
+   * with the same role that releases a payment.
+   */
+  {
+    path: 'banks',
+    component: Banks,
+    canActivate: [supervisorGuard],
   },
 
   // Closing the books is a supervisor's job, not a teller's.

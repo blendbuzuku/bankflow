@@ -53,5 +53,10 @@
     "target": "http://localhost:8082",
     "secure": false,
     "changeOrigin": true
+  },
+  "/api/banks": {
+    "target": "http://localhost:8082",
+    "secure": false,
+    "changeOrigin": true
   }
 }

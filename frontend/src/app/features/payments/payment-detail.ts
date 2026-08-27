@@ -11,6 +11,7 @@ import {
   TransactionService,
 } from '../../core/services/transaction';
 import { Toasts } from '../../core/services/toasts';
+import { MessageView } from '../../shared/message-view';
 
 /**
  * Everything known about one payment.
@@ -22,7 +23,7 @@ import { Toasts } from '../../core/services/toasts';
  */
 @Component({
   selector: 'app-payment-detail',
-  imports: [DecimalPipe, DatePipe, FormsModule],
+  imports: [DecimalPipe, DatePipe, FormsModule, MessageView],
   templateUrl: './payment-detail.html',
   styleUrl: './payment-detail.css',
 })

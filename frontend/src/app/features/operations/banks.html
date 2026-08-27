@@ -1,0 +1,98 @@
+<div class="page">
+
+  <header class="page-head">
+    <h1>Banks</h1>
+    <p>
+      The banks money can be sent to. A BIC chosen from this list cannot be
+      mistyped, which is the whole reason the list exists.
+    </p>
+  </header>
+
+  <section class="card">
+    <h2>Add a bank</h2>
+
+    <div class="row">
+      <div class="field">
+        <label for="bic">BIC</label>
+        <input id="bic" name="bic" [(ngModel)]="newBic" maxlength="11"
+               placeholder="TEBKXKPR" class="mono" />
+        <p class="hint">
+          8 or 11 characters. The country comes from the BIC itself
+          @if (countryOf(newBic.trim().toUpperCase()); as c) {
+            — this one says <strong>{{ c }}</strong>.
+          }
+        </p>
+      </div>
+
+      <div class="field grow">
+        <label for="bname">Name</label>
+        <input id="bname" name="bname" [(ngModel)]="newName" maxlength="140"
+               placeholder="Raiffeisen Bank Kosovo J.S.C." />
+      </div>
+
+      <button type="button" class="primary" (click)="add()"
+              [disabled]="!canAdd() || busy()">
+        Add
+      </button>
+    </div>
+  </section>
+
+  @if (loading()) {
+    <p class="status">Loading...</p>
+  } @else {
+
+    <section class="card">
+      <h2>In use ({{ activeBanks().length }})</h2>
+
+      @if (activeBanks().length === 0) {
+        <p class="empty">No banks yet. Nothing can be paid until one is added.</p>
+      } @else {
+        <ul class="banks">
+          @for (b of activeBanks(); track b.id) {
+            <li>
+              @if (renaming() === b.id) {
+                <input class="rename" name="rename" [(ngModel)]="renameTo"
+                       maxlength="140" />
+                <button type="button" class="small primary" (click)="rename(b)"
+                        [disabled]="busy() || !renameTo.trim()">Save</button>
+                <button type="button" class="small secondary"
+                        (click)="cancelRename()">Cancel</button>
+              } @else {
+                <span class="bic mono">{{ b.bic }}</span>
+                <span class="name">{{ b.name }}</span>
+                <span class="country">{{ b.country }}</span>
+
+                <button type="button" class="small secondary"
+                        (click)="startRename(b)" [disabled]="busy()">Rename</button>
+                <button type="button" class="small danger"
+                        (click)="toggle(b)" [disabled]="busy()">Retire</button>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    @if (retiredBanks().length) {
+      <section class="card retired-card">
+        <h2>Retired ({{ retiredBanks().length }})</h2>
+        <p class="explain">
+          Not offered on new payments. Kept because payments already sent quote
+          the BIC and still have to be explainable.
+        </p>
+
+        <ul class="banks">
+          @for (b of retiredBanks(); track b.id) {
+            <li class="retired">
+              <span class="bic mono">{{ b.bic }}</span>
+              <span class="name">{{ b.name }}</span>
+              <span class="country">{{ b.country }}</span>
+              <button type="button" class="small secondary"
+                      (click)="toggle(b)" [disabled]="busy()">Put back</button>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+</div>

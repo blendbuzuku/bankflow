@@ -88,9 +88,22 @@
             </div>
 
             <div class="field">
-              <label for="creditorAgentBic">Bank BIC <span class="req">required</span></label>
-              <input id="creditorAgentBic" name="creditorAgentBic" [(ngModel)]="creditorAgentBic"
-                     maxlength="11" placeholder="TEBKXKPR" />
+              <label for="creditorAgentBic">
+                Beneficiary's bank <span class="req">required</span>
+              </label>
+              <select id="creditorAgentBic" name="creditorAgentBic"
+                      [(ngModel)]="creditorAgentBic">
+                <option value="">Choose a bank</option>
+                @for (b of banks(); track b.bic) {
+                  <option [value]="b.bic">{{ b.label }}</option>
+                }
+              </select>
+              @if (banks().length === 0) {
+                <p class="hint">
+                  The bank directory is empty. Operations can add banks under
+                  Banks.
+                </p>
+              }
             </div>
           </div>
         } @else {
@@ -194,7 +207,7 @@
 
           @if (previewXml()) {
             <p class="ok">Valid against the KIPS schema.</p>
-            <pre class="xml">{{ previewXml() }}</pre>
+            <app-message-view [xml]="previewXml()" />
           } @else if (!previewError()) {
             <p class="empty">Preview the pacs.008 that would be sent.</p>
           }

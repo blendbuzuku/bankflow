@@ -3,6 +3,11 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Toasts } from '../../core/services/toasts';
+import {
+  BankDirectoryService,
+  CorrespondentBank,
+} from '../../core/services/bank-directory';
+import { MessageView } from '../../shared/message-view';
 
 import {
   AccountResponse,
@@ -30,7 +35,7 @@ import {
  */
 @Component({
   selector: 'app-payment-form',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, MessageView],
   templateUrl: './payment-form.html',
   styleUrl: './payment-form.css',
 })
@@ -40,6 +45,9 @@ export class PaymentForm implements OnInit {
   private readonly transactionService = inject(TransactionService);
   private readonly router = inject(Router);
   private readonly toasts = inject(Toasts);
+  private readonly bankDirectory = inject(BankDirectoryService);
+
+  readonly banks = signal<CorrespondentBank[]>([]);
 
   readonly rails = RAILS;
   readonly purposeCodes: PurposeCode[] =
@@ -89,6 +97,14 @@ export class PaymentForm implements OnInit {
         this.loadingAccounts.set(false);
       },
       error: () => this.loadingAccounts.set(false),
+    });
+
+    this.bankDirectory.selectable().subscribe({
+      next: banks => this.banks.set(banks),
+      error: () => this.toasts.error(
+        'Could not load the bank directory',
+        'A BIC cannot be chosen until it loads.',
+      ),
     });
   }
 

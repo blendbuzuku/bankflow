@@ -25,6 +25,7 @@
           </a>
           <a routerLink="/statements" routerLinkActive="active">Statements</a>
           @if (canApprove()) {
+            <a routerLink="/banks" routerLinkActive="active">Banks</a>
             <a routerLink="/end-of-day" routerLinkActive="active">End of day</a>
           }
         } @else {

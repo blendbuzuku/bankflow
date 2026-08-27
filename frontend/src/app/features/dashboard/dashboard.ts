@@ -14,6 +14,10 @@ import {
 import { Onboarding } from './onboarding';
 import { Toasts } from '../../core/services/toasts';
 import {
+  BankDirectoryService,
+  CorrespondentBank,
+} from '../../core/services/bank-directory';
+import {
   CustomerLimits,
   PaymentTypeCode,
   RAILS,
@@ -41,6 +45,9 @@ export class Dashboard implements OnInit {
   private readonly accountService = inject(AccountService);
   private readonly transactionService = inject(TransactionService);
   private readonly toasts = inject(Toasts);
+  private readonly bankDirectory = inject(BankDirectoryService);
+
+  readonly banks = signal<CorrespondentBank[]>([]);
 
   readonly user = signal<UserResponse | null>(null);
   readonly client = signal<ClientResponse | null>(null);
@@ -99,6 +106,11 @@ export class Dashboard implements OnInit {
         this.history.set(history);
         this.limits.set(limits);
         this.loading.set(false);
+
+        this.bankDirectory.selectable().subscribe({
+          next: banks => this.banks.set(banks),
+          error: () => { /* the form warns when the list is empty */ },
+        });
 
         if (client === undefined) {
           this.errorMessage.set('Unable to load your client profile.');

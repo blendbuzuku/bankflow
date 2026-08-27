@@ -1,0 +1,51 @@
+<div class="message-view">
+
+  <div class="view-switch">
+    <button type="button" [class.on]="!showXml()" (click)="showXml.set(false)">
+      Readable
+    </button>
+    <button type="button" [class.on]="showXml()" (click)="showXml.set(true)">
+      XML
+    </button>
+  </div>
+
+  @if (showXml()) {
+    <pre class="xml">{{ xml() }}</pre>
+  } @else if (parseError()) {
+    <div class="alert error">{{ parseError() }}</div>
+    <pre class="xml">{{ xml() }}</pre>
+  } @else {
+    <div class="tree">
+      @for (n of nodes(); track n.tag) {
+        <ng-container *ngTemplateOutlet="node; context: { $implicit: n }" />
+      }
+    </div>
+  }
+</div>
+
+<ng-template #node let-n>
+  <div class="node" [style.padding-left.px]="n.depth * 14">
+
+    <div class="row" [class.leaf]="n.value !== null">
+      <span class="label">{{ n.label }}</span>
+
+      @if (n.value !== null) {
+        <span class="value">{{ n.value }}</span>
+
+        @if (n.meaning) {
+          <span class="meaning">{{ n.meaning }}</span>
+        }
+      }
+
+      @for (a of n.attributes; track a.name) {
+        <span class="attr">{{ a.name }} {{ a.value }}</span>
+      }
+
+      <span class="tag">{{ n.tag }}</span>
+    </div>
+  </div>
+
+  @for (child of n.children; track $index) {
+    <ng-container *ngTemplateOutlet="node; context: { $implicit: child }" />
+  }
+</ng-template>
