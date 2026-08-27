@@ -151,6 +151,35 @@ export interface RecallResponse {
   createdAt: string;
 }
 
+export interface StatementEntry {
+  entryReference: string | null;
+  transactionReference: string | null;
+  creditDebitIndicator: 'CRDT' | 'DBIT';
+  amount: number;
+  currency: Currency;
+  bookingDate: string;
+  valueDate: string | null;
+  balanceAfter: number;
+  description: string;
+}
+
+export interface StatementResponse {
+  statementId: string;
+  accountId: number;
+  iban: string;
+  accountName: string | null;
+  currency: Currency;
+  from: string;
+  to: string;
+  openingBalance: number;
+  closingBalance: number;
+  totalCredits: number;
+  totalDebits: number;
+  creditCount: number;
+  debitCount: number;
+  entries: StatementEntry[];
+}
+
 export interface CustomerLimits {
   selfServiceEnabled: boolean;
   permittedRails: PaymentTypeCode[];
@@ -365,6 +394,24 @@ export class TransactionService {
   }
 
   // --- approvals ---------------------------------------------------------
+
+  // --- statements ---
+
+  statement(accountId: number, from: string, to: string):
+    Observable<StatementResponse> {
+
+    return this.http.get<StatementResponse>(
+      `/api/statements/account/${accountId}?from=${from}&to=${to}`,
+    );
+  }
+
+  /** The same statement as camt.053, for anyone who wants the ISO form. */
+  statementXml(accountId: number, from: string, to: string): Observable<string> {
+    return this.http.get(
+      `/api/statements/account/${accountId}/camt053?from=${from}&to=${to}`,
+      { responseType: 'text' },
+    );
+  }
 
   // --- recalls ---
 

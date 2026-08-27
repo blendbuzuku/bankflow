@@ -7,10 +7,12 @@ import { PaymentForm } from './features/payments/payment-form';
 import { PaymentDetail } from './features/payments/payment-detail';
 import { ApprovalQueue } from './features/payments/approval-queue';
 import { RecallQueue } from './features/payments/recall-queue';
+import { Statements } from './features/statements/statements';
 import { Overview } from './features/operations/overview';
 import { Clients } from './features/operations/clients';
 import { EndOfDay } from './features/operations/end-of-day';
 
+import { authGuard } from './core/guards/auth-guard';
 import {
   customerGuard,
   landingGuard,
@@ -88,6 +90,16 @@ export const routes: Routes = [
     path: 'end-of-day',
     component: EndOfDay,
     canActivate: [supervisorGuard],
+  },
+
+  /*
+   * Both roles use this one: staff pick any account, a customer only their
+   * own, and the server enforces the difference either way.
+   */
+  {
+    path: 'statements',
+    component: Statements,
+    canActivate: [authGuard],
   },
 
   { path: '**', redirectTo: '' },

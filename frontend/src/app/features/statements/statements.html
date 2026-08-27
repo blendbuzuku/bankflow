@@ -1,0 +1,134 @@
+<div class="page">
+
+  <header class="page-head">
+    <h1>Statements</h1>
+    <p>
+      What an account did over a period, built from the ledger — so it explains
+      the balance rather than merely listing payments.
+    </p>
+  </header>
+
+  <section class="card controls">
+    <div class="field grow">
+      <label for="acc">Account</label>
+      <select id="acc" name="acc" [(ngModel)]="accountId" (ngModelChange)="load()">
+        @for (a of accounts(); track a.id) {
+          <option [ngValue]="a.id">{{ label(a) }}</option>
+        }
+      </select>
+      @if (!loadingAccounts() && accounts().length === 0) {
+        <p class="hint">No accounts to report on.</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="from">From</label>
+      <input id="from" name="from" type="date" [(ngModel)]="from" />
+    </div>
+
+    <div class="field">
+      <label for="to">To</label>
+      <input id="to" name="to" type="date" [(ngModel)]="to" />
+    </div>
+
+    <button type="button" class="primary" (click)="load()"
+            [disabled]="!accountId || loading()">
+      Show
+    </button>
+  </section>
+
+  @if (error()) { <div class="alert error">{{ error() }}</div> }
+
+  @if (loading()) {
+    <p class="status">Building the statement...</p>
+  } @else if (statement(); as s) {
+
+    <section class="card summary-card">
+      <div class="summary-head">
+        <div>
+          <h2>{{ s.iban }}</h2>
+          <p class="who">
+            {{ s.accountName }} ·
+            {{ s.from | date: 'dd MMM yyyy' }} to {{ s.to | date: 'dd MMM yyyy' }}
+          </p>
+        </div>
+        <span class="stmt-id mono">{{ s.statementId }}</span>
+      </div>
+
+      <dl class="totals">
+        <div>
+          <dt>Opening</dt>
+          <dd class="num">{{ s.openingBalance | number: '1.2-2' }} {{ s.currency }}</dd>
+        </div>
+        <div>
+          <dt>Paid in</dt>
+          <dd class="num in">
+            {{ s.totalCredits | number: '1.2-2' }}
+            <small>{{ s.creditCount }} {{ s.creditCount === 1 ? 'entry' : 'entries' }}</small>
+          </dd>
+        </div>
+        <div>
+          <dt>Paid out</dt>
+          <dd class="num out">
+            {{ s.totalDebits | number: '1.2-2' }}
+            <small>{{ s.debitCount }} {{ s.debitCount === 1 ? 'entry' : 'entries' }}</small>
+          </dd>
+        </div>
+        <div>
+          <dt>Closing</dt>
+          <dd class="num strong">{{ s.closingBalance | number: '1.2-2' }} {{ s.currency }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Entries</h2>
+        <button type="button" class="link" (click)="toggleXml()">
+          @if (showXml()) { Hide camt.053 } @else { View as camt.053 }
+        </button>
+      </div>
+
+      @if (showXml()) {
+        <pre class="xml">{{ xml() }}</pre>
+      }
+
+      @if (isEmpty()) {
+        <p class="empty">Nothing moved through this account in that period.</p>
+      } @else {
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Detail</th>
+                <th class="numeric">Out</th>
+                <th class="numeric">In</th>
+                <th class="numeric">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (e of s.entries; track e.entryReference) {
+                <tr>
+                  <td class="date">{{ e.bookingDate | date: 'dd MMM' }}</td>
+                  <td class="detail">{{ e.description }}</td>
+                  <td class="numeric out">
+                    @if (e.creditDebitIndicator === 'DBIT') {
+                      {{ e.amount | number: '1.2-2' }}
+                    }
+                  </td>
+                  <td class="numeric in">
+                    @if (e.creditDebitIndicator === 'CRDT') {
+                      {{ e.amount | number: '1.2-2' }}
+                    }
+                  </td>
+                  <td class="numeric balance">{{ e.balanceAfter | number: '1.2-2' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  }
+</div>

@@ -23,11 +23,13 @@
             Recalls
             @if (recallCount() > 0) { <span class="badge">{{ recallCount() }}</span> }
           </a>
+          <a routerLink="/statements" routerLinkActive="active">Statements</a>
           @if (canApprove()) {
             <a routerLink="/end-of-day" routerLinkActive="active">End of day</a>
           }
         } @else {
           <a routerLink="/dashboard" routerLinkActive="active">My banking</a>
+          <a routerLink="/statements" routerLinkActive="active">Statements</a>
         }
       </nav>
 
