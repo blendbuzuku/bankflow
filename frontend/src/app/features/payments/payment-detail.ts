@@ -6,9 +6,11 @@ import { ActivatedRoute } from '@angular/router';
 import {
   AuditEvent,
   PacsMessage,
+  RecallResponse,
   TransactionResponse,
   TransactionService,
 } from '../../core/services/transaction';
+import { Toasts } from '../../core/services/toasts';
 
 /**
  * Everything known about one payment.
@@ -28,6 +30,7 @@ export class PaymentDetail implements OnInit {
 
   private readonly route = inject(ActivatedRoute);
   private readonly transactionService = inject(TransactionService);
+  private readonly toasts = inject(Toasts);
 
   readonly transaction = signal<TransactionResponse | null>(null);
   readonly audit = signal<AuditEvent[]>([]);
@@ -54,6 +57,23 @@ export class PaymentDetail implements OnInit {
   ];
 
   selectedReason = 'AC01';
+
+  // --- recall ---
+
+  readonly recalls = signal<RecallResponse[]>([]);
+  readonly showRecallForm = signal(false);
+  readonly recalling = signal(false);
+
+  recallReason = 'CUST';
+  recallNote = '';
+
+  /** Why a settled payment might be asked back. */
+  readonly recallReasons = [
+    { code: 'CUST', label: 'The customer asked for it back' },
+    { code: 'AC01', label: 'Wrong account number' },
+    { code: 'AM05', label: 'Sent twice' },
+    { code: 'RR04', label: 'Regulatory reason' },
+  ];
 
   readonly simulating = signal(false);
   readonly simulateError = signal('');
@@ -92,7 +112,108 @@ export class PaymentDetail implements OnInit {
       next: messages => this.messages.set(messages),
       error: () => this.messages.set([]),
     });
+
+    this.loadRecalls(reference);
   }
+
+  private loadRecalls(reference: string): void {
+
+    this.transactionService.recallsFor(reference).subscribe({
+      next: recalls => this.recalls.set(recalls),
+      error: () => this.recalls.set([]),
+    });
+  }
+
+  /**
+   * A settled outbound payment is the only thing worth asking back: one still
+   * in flight should be left to settle or fail on its own, and an internal
+   * transfer never left the bank.
+   */
+  canRecall(): boolean {
+
+    const t = this.transaction();
+
+    return t?.status === 'SETTLED'
+      && t?.direction === 'OUTBOUND'
+      && !this.openRecall();
+  }
+
+  openRecall(): RecallResponse | undefined {
+    return this.recalls().find(r => r.status === 'REQUESTED');
+  }
+
+  toggleRecallForm(): void {
+    this.showRecallForm.set(!this.showRecallForm());
+    this.recallNote = '';
+  }
+
+  requestRecall(): void {
+
+    const reference = this.transaction()?.transactionReference;
+
+    if (!reference) {
+      return;
+    }
+
+    this.recalling.set(true);
+
+    this.transactionService
+      .requestRecall(reference, this.recallReason, this.recallNote)
+      .subscribe({
+        next: recall => {
+          this.recalling.set(false);
+          this.showRecallForm.set(false);
+          this.recallNote = '';
+          this.toasts.success(
+            'Recall requested',
+            `camt.056 ${recall.cancellationId} sent. No funds have moved yet.`,
+          );
+          this.loadRecalls(reference);
+          this.refreshMessages(reference);
+        },
+        error: error => {
+          this.recalling.set(false);
+          this.toasts.failure('The recall could not be requested', error);
+        },
+      });
+  }
+
+  /** Plays the beneficiary bank agreeing and sending the money back. */
+  simulateReturn(): void {
+
+    const reference = this.transaction()?.transactionReference;
+
+    if (!reference) {
+      return;
+    }
+
+    this.recalling.set(true);
+
+    this.transactionService.simulateReturn(reference, 'AC04').subscribe({
+      next: () => {
+        this.recalling.set(false);
+        this.toasts.success(
+          'Payment returned',
+          'The funds are back with the debtor.',
+        );
+        this.reload(reference);
+      },
+      error: error => {
+        this.recalling.set(false);
+        this.toasts.failure('The return could not be simulated', error);
+      },
+    });
+  }
+
+  private refreshMessages(reference: string): void {
+
+    this.transactionService.messages(reference).subscribe({
+      next: messages => this.messages.set(messages),
+      error: () => { /* the action succeeded; a stale list is not worth an error */ },
+    });
+  }
+
+
 
   /** Only a payment still in flight can receive a status report. */
   awaitingCounterparty(): boolean {
@@ -140,10 +261,8 @@ export class PaymentDetail implements OnInit {
       error: () => { /* as above */ },
     });
 
-    this.transactionService.messages(reference).subscribe({
-      next: messages => this.messages.set(messages),
-      error: () => { /* as above */ },
-    });
+    this.refreshMessages(reference);
+    this.loadRecalls(reference);
   }
 
   toggleMessage(message: PacsMessage): void {

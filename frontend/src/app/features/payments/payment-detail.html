@@ -109,6 +109,70 @@
       </section>
     }
 
+    @if (canRecall() || openRecall()) {
+      <section class="card wide-card recall-panel">
+        <h2>Recall</h2>
+
+        @if (openRecall(); as open) {
+          <p class="explain">
+            We have asked the beneficiary's bank to send this back
+            (<span class="mono">{{ open.cancellationId }}</span>,
+            {{ open.reasonCode }}). Nothing has moved: the answer is theirs to
+            give, and it arrives as a payment return.
+          </p>
+
+          <div class="sim">
+            <button type="button" class="accept" (click)="simulateReturn()"
+                    [disabled]="recalling()">
+              Play them agreeing (pacs.004)
+            </button>
+          </div>
+
+        } @else if (showRecallForm()) {
+          <p class="explain">
+            This asks the beneficiary's bank to send the money back. It is a
+            request, not an instruction — they may refuse, and no funds move
+            until they agree.
+          </p>
+
+          <div class="field">
+            <label for="rr">Why</label>
+            <select id="rr" name="rr" [(ngModel)]="recallReason">
+              @for (r of recallReasons; track r.code) {
+                <option [value]="r.code">{{ r.code }} — {{ r.label }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="rn">Note</label>
+            <input id="rn" name="rn" [(ngModel)]="recallNote" maxlength="105"
+                   placeholder="What the counterparty should know" />
+          </div>
+
+          <div class="sim">
+            <button type="button" class="reject" (click)="requestRecall()"
+                    [disabled]="recalling()">
+              Send the recall request
+            </button>
+            <button type="button" class="secondary" (click)="toggleRecallForm()">
+              Cancel
+            </button>
+          </div>
+
+        } @else {
+          <p class="explain">
+            This payment has settled. If it went to the wrong place, the money
+            can be asked back from the beneficiary's bank.
+          </p>
+
+          <button type="button" class="secondary" (click)="toggleRecallForm()">
+            Request a recall
+          </button>
+        }
+      </section>
+    }
+
     <section class="card wide-card">
       <h2>What happened</h2>
 

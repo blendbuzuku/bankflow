@@ -6,6 +6,7 @@ import { Dashboard } from './features/dashboard/dashboard';
 import { PaymentForm } from './features/payments/payment-form';
 import { PaymentDetail } from './features/payments/payment-detail';
 import { ApprovalQueue } from './features/payments/approval-queue';
+import { RecallQueue } from './features/payments/recall-queue';
 import { Overview } from './features/operations/overview';
 import { Clients } from './features/operations/clients';
 import { EndOfDay } from './features/operations/end-of-day';
@@ -69,6 +70,16 @@ export const routes: Routes = [
   {
     path: 'approvals',
     component: ApprovalQueue,
+    canActivate: [staffGuard],
+  },
+
+  /*
+   * A teller can see the queue and raise a recall; only a supervisor answers
+   * one, which the screen enforces per row rather than at the route.
+   */
+  {
+    path: 'recalls',
+    component: RecallQueue,
     canActivate: [staffGuard],
   },
 

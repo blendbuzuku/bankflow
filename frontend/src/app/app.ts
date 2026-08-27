@@ -34,6 +34,7 @@ export class App {
 
   readonly user = signal<UserResponse | null>(null);
   readonly pendingCount = signal(0);
+  readonly recallCount = signal(0);
 
   /** Login and registration stand alone, without the shell around them. */
   readonly showChrome = signal(false);
@@ -57,6 +58,7 @@ export class App {
     if (authScreen || !this.authService.isAuthenticated()) {
       this.user.set(null);
       this.pendingCount.set(0);
+      this.recallCount.set(0);
       return;
     }
 
@@ -85,12 +87,18 @@ export class App {
 
     if (!this.isStaff()) {
       this.pendingCount.set(0);
+      this.recallCount.set(0);
       return;
     }
 
     this.transactionService.awaitingApproval().subscribe({
       next: pending => this.pendingCount.set(pending.length),
       error: () => this.pendingCount.set(0),
+    });
+
+    this.transactionService.openRecalls().subscribe({
+      next: recalls => this.recallCount.set(recalls.length),
+      error: () => this.recallCount.set(0),
     });
   }
 

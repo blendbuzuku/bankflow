@@ -19,6 +19,10 @@
             Approvals
             @if (pendingCount() > 0) { <span class="badge">{{ pendingCount() }}</span> }
           </a>
+          <a routerLink="/recalls" routerLinkActive="active">
+            Recalls
+            @if (recallCount() > 0) { <span class="badge">{{ recallCount() }}</span> }
+          </a>
           @if (canApprove()) {
             <a routerLink="/end-of-day" routerLinkActive="active">End of day</a>
           }

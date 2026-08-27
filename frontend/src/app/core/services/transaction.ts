@@ -130,6 +130,27 @@ export interface TransactionResponse {
   createdAt: string;
 }
 
+// --- recalls and returns ---
+
+export type RecallDirection = 'OUTBOUND' | 'INBOUND';
+export type RecallStatus = 'REQUESTED' | 'ACCEPTED' | 'REJECTED';
+
+export interface RecallResponse {
+  id: number;
+  cancellationId: string;
+  transactionReference: string;
+  direction: RecallDirection;
+  status: RecallStatus;
+  reasonCode: string;
+  reasonDescription: string;
+  additionalInformation: string | null;
+  requestedByUsername: string | null;
+  decidedByUsername: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  createdAt: string;
+}
+
 export interface CustomerLimits {
   selfServiceEnabled: boolean;
   permittedRails: PaymentTypeCode[];
@@ -344,6 +365,49 @@ export class TransactionService {
   }
 
   // --- approvals ---------------------------------------------------------
+
+  // --- recalls ---
+
+  /** Everything waiting for someone to decide, in either direction. */
+  openRecalls(): Observable<RecallResponse[]> {
+    return this.http.get<RecallResponse[]>('/api/recalls');
+  }
+
+  recallsFor(reference: string): Observable<RecallResponse[]> {
+    return this.http.get<RecallResponse[]>(
+      `/api/recalls/transaction/${encodeURIComponent(reference)}`,
+    );
+  }
+
+  /** Asks the beneficiary's bank to send one of our payments back. */
+  requestRecall(
+    transactionReference: string,
+    reasonCode: string,
+    note: string,
+  ): Observable<RecallResponse> {
+
+    return this.http.post<RecallResponse>('/api/recalls', {
+      transactionReference, reasonCode, note,
+    });
+  }
+
+  acceptRecall(id: number, note: string): Observable<RecallResponse> {
+    return this.http.post<RecallResponse>(`/api/recalls/${id}/accept`, { note });
+  }
+
+  rejectRecall(id: number, note: string): Observable<RecallResponse> {
+    return this.http.post<RecallResponse>(`/api/recalls/${id}/reject`, { note });
+  }
+
+  /** Simulates the beneficiary bank sending a settled payment back. */
+  simulateReturn(reference: string, reasonCode: string): Observable<string> {
+    return this.http.post(
+      `/api/kips/simulate/return/${encodeURIComponent(reference)}`
+        + `?reason=${encodeURIComponent(reasonCode)}`,
+      null,
+      { responseType: 'text' },
+    );
+  }
 
   awaitingApproval(): Observable<TransactionResponse[]> {
     return this.http.get<TransactionResponse[]>('/api/approvals');

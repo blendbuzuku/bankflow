@@ -1,0 +1,93 @@
+<div class="page">
+
+  <header class="page-head">
+    <h1>Recalls</h1>
+    <p>
+      Requests to send a settled payment back. Asking moves nothing — only an
+      accepted recall does, and it goes back as a return.
+    </p>
+  </header>
+
+  @if (error()) { <div class="alert error">{{ error() }}</div> }
+
+  @if (loading()) {
+    <p class="status">Loading...</p>
+  } @else if (recalls().length === 0) {
+    <div class="card empty-card">
+      <p class="empty">Nothing is waiting for an answer.</p>
+    </div>
+  } @else {
+
+    <div class="list">
+      @for (r of recalls(); track r.id) {
+        <article class="card recall" [class.ours]="isOurs(r)">
+
+          <div class="recall-head">
+            <a class="ref mono" [routerLink]="['/payments', r.transactionReference]">
+              {{ r.transactionReference }}
+            </a>
+
+            @if (isOurs(r)) {
+              <span class="pill in">They are asking us</span>
+            } @else {
+              <span class="pill out">We are asking them</span>
+            }
+
+            <span class="when">{{ r.createdAt | date: 'dd MMM HH:mm' }}</span>
+          </div>
+
+          <dl class="facts">
+            <div><dt>Reason</dt><dd>{{ r.reasonCode }} — {{ r.reasonDescription }}</dd></div>
+            <div><dt>Reference</dt><dd class="mono">{{ r.cancellationId }}</dd></div>
+            @if (r.requestedByUsername) {
+              <div><dt>Raised by</dt><dd>{{ r.requestedByUsername }}</dd></div>
+            }
+            @if (r.additionalInformation) {
+              <div class="wide"><dt>Note</dt><dd>{{ r.additionalInformation }}</dd></div>
+            }
+          </dl>
+
+          @if (!isOurs(r)) {
+            <p class="note">
+              We asked for this one back. The answer is the beneficiary bank's
+              to give — it arrives as a payment return, or not at all.
+            </p>
+          } @else if (!canDecide()) {
+            <p class="note">
+              Accepting takes money out of a customer's account, so it needs a
+              supervisor.
+            </p>
+          } @else if (deciding() === r.id) {
+
+            <div class="decide">
+              <label [attr.for]="'note-' + r.id">Note</label>
+              <input [attr.id]="'note-' + r.id" name="note"
+                     [(ngModel)]="decisionNote"
+                     placeholder="Why, for the record" />
+
+              <div class="btn-row">
+                <button type="button" class="accept" (click)="accept(r)"
+                        [disabled]="busy() === r.id">
+                  Accept and return the funds
+                </button>
+                <button type="button" class="reject" (click)="reject(r)"
+                        [disabled]="busy() === r.id">
+                  Refuse
+                </button>
+                <button type="button" class="secondary" (click)="cancelDecision()">
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+          } @else {
+            <button type="button" class="primary" (click)="startDecision(r)">
+              Decide
+            </button>
+          }
+
+        </article>
+      }
+    </div>
+  }
+</div>
