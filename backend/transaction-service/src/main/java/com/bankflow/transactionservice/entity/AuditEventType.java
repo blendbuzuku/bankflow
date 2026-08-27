@@ -36,6 +36,10 @@ public enum AuditEventType {
     PACS_MESSAGE_GENERATED,
     PACS_MESSAGE_RECEIVED,
 
+    /** A day was signed off, or an attempt to sign it off was refused. */
+    DAY_CLOSED,
+    DAY_CLOSE_REFUSED,
+
     /** The list of banks that can be paid was changed. */
     BANK_DIRECTORY_CHANGED,
 
