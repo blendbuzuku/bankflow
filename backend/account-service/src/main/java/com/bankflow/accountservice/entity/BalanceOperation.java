@@ -59,6 +59,13 @@ public class BalanceOperation {
     )
     private LocalDateTime createdAt;
 
+    /**
+     * The business day this movement belongs to, which after a close is not
+     * the day it was recorded on.
+     */
+    @Column(name = "booking_date", nullable = false)
+    private java.time.LocalDate bookingDate;
+
     public BalanceOperation() {
     }
 
@@ -104,6 +111,14 @@ public class BalanceOperation {
 
     public void setCurrency(Currency currency) {
         this.currency = currency;
+    }
+
+    public java.time.LocalDate getBookingDate() {
+        return bookingDate;
+    }
+
+    public void setBookingDate(java.time.LocalDate bookingDate) {
+        this.bookingDate = bookingDate;
     }
 
     public LocalDateTime getCreatedAt() {

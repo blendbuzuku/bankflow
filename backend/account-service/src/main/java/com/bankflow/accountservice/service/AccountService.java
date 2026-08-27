@@ -557,6 +557,18 @@ public class AccountService {
                 request.getOperationId()
         );
 
+        /*
+         * The caller's business date, falling back to today for a caller that
+         * does not track one. Filing it anywhere else would put the movement
+         * in a different day from the ledger entry it belongs to, and
+         * reconciliation would report both as breaks.
+         */
+        operation.setBookingDate(
+                request.getBookingDate() != null
+                        ? request.getBookingDate()
+                        : java.time.LocalDate.now()
+        );
+
         operation.setAccountId(accountId);
 
         operation.setOperation(

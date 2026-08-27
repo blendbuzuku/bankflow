@@ -1,5 +1,6 @@
 package com.bankflow.transactionservice.service;
 
+import com.bankflow.transactionservice.calendar.BusinessCalendar;
 import com.bankflow.common.exception.BusinessException;
 import com.bankflow.transactionservice.client.AccountClient;
 import com.bankflow.transactionservice.dto.AccountResponse;
@@ -43,6 +44,7 @@ import java.util.UUID;
 @Service
 public class OutboundPaymentService {
 
+    private final BusinessCalendar businessCalendar;
     private final TransactionRepository transactionRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
     private final AccountClient accountClient;
@@ -66,7 +68,8 @@ public class OutboundPaymentService {
             PacsMessageService pacsMessageService,
             MessageIdGenerator messageIdGenerator,
             ApprovalService approvalService,
-            FundsCheck fundsCheck) {
+            FundsCheck fundsCheck,
+            BusinessCalendar businessCalendar) {
 
         this.approvalService = approvalService;
         this.fundsCheck = fundsCheck;
@@ -80,6 +83,7 @@ public class OutboundPaymentService {
         this.suspenseAccounts = suspenseAccounts;
         this.pacsMessageService = pacsMessageService;
         this.messageIdGenerator = messageIdGenerator;
+        this.businessCalendar = businessCalendar;
     }
 
     @Transactional
@@ -119,7 +123,7 @@ public class OutboundPaymentService {
                 request.getAmount(),
                 chargeBearer,
                 PaymentDirection.OUTBOUND,
-                LocalDate.now()
+                businessCalendar.today()
         );
 
         BigDecimal totalDebit = fee.totalDebitFor(request.getAmount());
@@ -340,8 +344,10 @@ public class OutboundPaymentService {
         transaction.setDebtorFeeAmount(fee.debtorFee());
         transaction.setCreditorFeeAmount(fee.creditorFee());
 
-        transaction.setBookingDate(LocalDate.now());
-        transaction.setValueDate(LocalDate.now());
+        LocalDate today = businessCalendar.today();
+
+        transaction.setBookingDate(today);
+        transaction.setValueDate(today);
         transaction.setStatus(TransactionStatus.PENDING);
 
         if (paymentType == PaymentType.KIPS_RTGS) {

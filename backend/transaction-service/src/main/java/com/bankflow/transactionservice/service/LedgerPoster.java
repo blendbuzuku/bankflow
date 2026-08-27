@@ -1,6 +1,8 @@
 package com.bankflow.transactionservice.service;
 
+import com.bankflow.transactionservice.calendar.BusinessCalendar;
 import com.bankflow.transactionservice.client.AccountClient;
+import com.bankflow.transactionservice.eod.ClosedPeriodGuard;
 import com.bankflow.transactionservice.dto.AccountResponse;
 import com.bankflow.transactionservice.dto.BalanceOperationRequest;
 import com.bankflow.transactionservice.entity.AuditEventType;
@@ -31,18 +33,24 @@ import java.util.UUID;
 @Service
 public class LedgerPoster {
 
+    private final BusinessCalendar businessCalendar;
     private final AccountClient accountClient;
     private final LedgerEntryRepository ledgerEntryRepository;
     private final AuditService auditService;
+    private final ClosedPeriodGuard closedPeriods;
 
     public LedgerPoster(
             AccountClient accountClient,
             LedgerEntryRepository ledgerEntryRepository,
-            AuditService auditService) {
+            AuditService auditService,
+            ClosedPeriodGuard closedPeriods,
+            BusinessCalendar businessCalendar) {
 
         this.accountClient = accountClient;
         this.ledgerEntryRepository = ledgerEntryRepository;
         this.auditService = auditService;
+        this.closedPeriods = closedPeriods;
+        this.businessCalendar = businessCalendar;
     }
 
     public LedgerEntry debit(
@@ -82,12 +90,25 @@ public class LedgerPoster {
             String operationId,
             LedgerEntryType entryType) {
 
+        LocalDate bookingDate = transaction.getBookingDate() != null
+                ? transaction.getBookingDate()
+                : businessCalendar.today();
+
+        /*
+         * Refused before the balance moves, not after. The account lives in
+         * another service, so a posting rejected once the money had already
+         * shifted would leave exactly the cross-service half-commit that
+         * reconciliation exists to catch.
+         */
+        closedPeriods.requireOpen(bookingDate);
+
         BalanceOperationRequest request =
                 new BalanceOperationRequest(
                         amount,
                         entryType.name(),
                         transaction.getCurrency().name(),
-                        operationId
+                        operationId,
+                        bookingDate
                 );
 
         AccountResponse result =
@@ -103,16 +124,12 @@ public class LedgerPoster {
         entry.setAmount(amount);
         entry.setCurrency(transaction.getCurrency());
 
-        entry.setBookingDate(
-                transaction.getBookingDate() != null
-                        ? transaction.getBookingDate()
-                        : LocalDate.now()
-        );
+        entry.setBookingDate(bookingDate);
 
         entry.setValueDate(
                 transaction.getValueDate() != null
                         ? transaction.getValueDate()
-                        : LocalDate.now()
+                        : bookingDate
         );
 
         LedgerEntry saved = ledgerEntryRepository.save(entry);

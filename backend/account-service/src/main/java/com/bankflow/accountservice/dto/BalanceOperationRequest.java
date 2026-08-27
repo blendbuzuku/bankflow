@@ -24,7 +24,25 @@ public class BalanceOperationRequest {
     @NotBlank
     private String operationId;
 
+    /**
+     * The bank's business date, which after a close is not today. The movement
+     * is filed under the same day the ledger books it to, or reconciliation
+     * pairs them across a boundary and reports a break where nothing is wrong.
+     *
+     * Optional on the wire: a caller that does not send one gets today, which
+     * is what every caller meant before the distinction existed.
+     */
+    private java.time.LocalDate bookingDate;
+
     public BalanceOperationRequest() {
+    }
+
+    public java.time.LocalDate getBookingDate() {
+        return bookingDate;
+    }
+
+    public void setBookingDate(java.time.LocalDate bookingDate) {
+        this.bookingDate = bookingDate;
     }
 
     public BigDecimal getAmount() {

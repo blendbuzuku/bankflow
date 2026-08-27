@@ -54,10 +54,7 @@ public class ReconciliationController {
 
         List<BalanceOperationResponse> operations =
                 balanceOperationRepository
-                        .findByCreatedAtBetween(
-                                day.atStartOfDay(),
-                                day.atTime(LocalTime.MAX)
-                        )
+                        .findByBookingDate(day)
                         .stream()
                         .map(operation -> new BalanceOperationResponse(
                                 operation.getOperationId(),

@@ -1,5 +1,6 @@
 package com.bankflow.transactionservice.service;
 
+import com.bankflow.transactionservice.calendar.BusinessCalendar;
 import com.bankflow.common.exception.BusinessException;
 import com.bankflow.transactionservice.client.AccountClient;
 import com.bankflow.transactionservice.dto.AccountResponse;
@@ -43,6 +44,7 @@ import java.util.UUID;
 @Service
 public class TransactionService {
 
+    private final BusinessCalendar businessCalendar;
     private final TransactionRepository transactionRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
     private final AccountClient accountClient;
@@ -66,7 +68,8 @@ public class TransactionService {
             MessageIdGenerator messageIdGenerator,
             ApprovalService approvalService,
             LedgerPoster ledgerPoster,
-            FundsCheck fundsCheck) {
+            FundsCheck fundsCheck,
+            BusinessCalendar businessCalendar) {
 
         this.fundsCheck = fundsCheck;
         this.pacsMessageService = pacsMessageService;
@@ -80,6 +83,7 @@ public class TransactionService {
         this.feeService = feeService;
         this.auditService = auditService;
         this.auditEventRepository = auditEventRepository;
+        this.businessCalendar = businessCalendar;
     }
 
     /**
@@ -106,7 +110,7 @@ public class TransactionService {
                 amount,
                 bearer,
                 directionFor(type),
-                LocalDate.now()
+                businessCalendar.today()
         );
     }
 
@@ -179,8 +183,10 @@ public class TransactionService {
         draft.setRemittanceInformation(request.getRemittanceInformation());
         draft.setAmount(request.getAmount());
         draft.setCurrency(request.getCurrency());
-        draft.setBookingDate(LocalDate.now());
-        draft.setValueDate(LocalDate.now());
+        LocalDate businessDay = businessCalendar.today();
+
+        draft.setBookingDate(businessDay);
+        draft.setValueDate(businessDay);
         draft.setStatus(TransactionStatus.PENDING);
 
         draft.setCreditorName(request.getCreditorName());
@@ -309,7 +315,7 @@ public class TransactionService {
                 amount,
                 chargeBearer,
                 PaymentDirection.INTERNAL,
-                LocalDate.now()
+                businessCalendar.today()
         );
 
         /*
@@ -759,7 +765,7 @@ public class TransactionService {
             String endToEndId,
             String instructionId) {
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = businessCalendar.today();
 
         Transaction transaction = new Transaction();
 

@@ -25,6 +25,15 @@ public interface BalanceOperationRepository
      * Everything that moved in a window, for reconciliation against the callers'
      * own records.
      */
+    /**
+     * Every movement belonging to one business day.
+     *
+     * By booking date, not by the clock: after a close the two diverge, and
+     * matching on the timestamp would pair a movement against a ledger entry
+     * filed under a different day.
+     */
+    List<BalanceOperation> findByBookingDate(java.time.LocalDate bookingDate);
+
     List<BalanceOperation> findByCreatedAtBetween(
             LocalDateTime from,
             LocalDateTime to

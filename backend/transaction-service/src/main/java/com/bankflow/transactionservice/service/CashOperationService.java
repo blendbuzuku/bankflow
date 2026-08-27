@@ -1,5 +1,6 @@
 package com.bankflow.transactionservice.service;
 
+import com.bankflow.transactionservice.calendar.BusinessCalendar;
 import com.bankflow.common.exception.BusinessException;
 import com.bankflow.transactionservice.client.AccountClient;
 import com.bankflow.transactionservice.dto.AccountResponse;
@@ -31,6 +32,7 @@ import java.util.UUID;
 @Service
 public class CashOperationService {
 
+    private final BusinessCalendar businessCalendar;
     private final TransactionRepository transactionRepository;
     private final AccountClient accountClient;
     private final LedgerPoster ledgerPoster;
@@ -44,7 +46,8 @@ public class CashOperationService {
             LedgerPoster ledgerPoster,
             SuspenseAccountResolver suspenseAccounts,
             FundsCheck fundsCheck,
-            AuditService auditService) {
+            AuditService auditService,
+            BusinessCalendar businessCalendar) {
 
         this.transactionRepository = transactionRepository;
         this.accountClient = accountClient;
@@ -52,6 +55,7 @@ public class CashOperationService {
         this.suspenseAccounts = suspenseAccounts;
         this.fundsCheck = fundsCheck;
         this.auditService = auditService;
+        this.businessCalendar = businessCalendar;
     }
 
     /** Cash paid in: DR suspense, CR the customer. */
@@ -199,8 +203,14 @@ public class CashOperationService {
         transaction.setCurrency(Currency.valueOf(account.currency()));
         transaction.setRemittanceInformation(narrative);
 
-        transaction.setBookingDate(LocalDate.now());
-        transaction.setValueDate(LocalDate.now());
+        /*
+         * The business date, not the clock: cash taken after the books were
+         * closed is tomorrow's business.
+         */
+        LocalDate today = businessCalendar.today();
+
+        transaction.setBookingDate(today);
+        transaction.setValueDate(today);
         transaction.setStatus(TransactionStatus.PROCESSING);
 
         try {
