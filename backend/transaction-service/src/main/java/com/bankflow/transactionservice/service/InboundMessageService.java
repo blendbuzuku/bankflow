@@ -1,5 +1,6 @@
 package com.bankflow.transactionservice.service;
 
+import com.bankflow.transactionservice.calendar.BusinessCalendar;
 import com.bankflow.common.exception.BusinessException;
 import com.bankflow.transactionservice.client.AccountClient;
 import com.bankflow.transactionservice.dto.AccountResponse;
@@ -35,6 +36,7 @@ public class InboundMessageService {
     private static final Logger log =
             LoggerFactory.getLogger(InboundMessageService.class);
 
+    private final BusinessCalendar businessCalendar;
     private final PacsMessageParser parser;
     private final PacsMessageRepository messageRepository;
     private final PacsMessageService pacsMessageService;
@@ -62,7 +64,8 @@ public class InboundMessageService {
             SuspenseAccountResolver suspenseAccounts,
             AuditService auditService,
             PaymentReturnService paymentReturnService,
-            RecallService recallService) {
+            RecallService recallService,
+            BusinessCalendar businessCalendar) {
 
         this.parser = parser;
         this.messageRepository = messageRepository;
@@ -77,6 +80,7 @@ public class InboundMessageService {
         this.auditService = auditService;
         this.paymentReturnService = paymentReturnService;
         this.recallService = recallService;
+        this.businessCalendar = businessCalendar;
     }
 
     /**
@@ -301,11 +305,22 @@ public class InboundMessageService {
 
         transaction.setRemittanceInformation(parsed.remittance());
 
-        transaction.setBookingDate(LocalDate.now());
-        transaction.setValueDate(LocalDate.now());
+        LocalDate today = businessCalendar.today();
+
+        transaction.setBookingDate(today);
+        transaction.setValueDate(today);
         transaction.setStatus(TransactionStatus.PROCESSING);
 
         transaction = transactionRepository.save(transaction);
+
+        /*
+         * Link the message we stored on the way in to the payment it just
+         * created. It arrives before the transaction exists, so it has to be
+         * attached afterwards — without this the incoming pacs.008 is filed
+         * under no payment at all, and the customer who received the money
+         * cannot see what was sent for it.
+         */
+        linkToTransaction(parsed, transaction.getTransactionReference());
 
         /*
          * Build the acknowledgement before booking anything.
@@ -729,6 +744,27 @@ public class InboundMessageService {
     }
 
     // --- storage -----------------------------------------------------------
+
+    /**
+     * Files an inbound message under the payment it belongs to.
+     *
+     * Silent when the message is not there: it may have been a replay, already
+     * stored and already linked, and failing the whole payment over a
+     * bookkeeping detail would be the wrong trade.
+     */
+    private void linkToTransaction(ParsedMessage parsed, String reference) {
+
+        if (parsed.messageId() == null) {
+            return;
+        }
+
+        messageRepository.findByMessageId(parsed.messageId())
+                .filter(message -> message.getTransactionReference() == null)
+                .ifPresent(message -> {
+                    message.setTransactionReference(reference);
+                    messageRepository.save(message);
+                });
+    }
 
     private void store(ParsedMessage parsed, String xml) {
 

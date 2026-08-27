@@ -5,7 +5,10 @@ import com.bankflow.transactionservice.dto.TransferRequest;
 import com.bankflow.transactionservice.service.CustomerPaymentProperties;
 import com.bankflow.transactionservice.service.CustomerPaymentService;
 import jakarta.validation.Valid;
+import com.bankflow.transactionservice.pacs.PacsMessage;
+import com.bankflow.transactionservice.pacs.PacsMessageService;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -28,13 +31,16 @@ public class CustomerPaymentController {
 
     private final CustomerPaymentService customerPaymentService;
     private final CustomerPaymentProperties properties;
+    private final PacsMessageService pacsMessageService;
 
     public CustomerPaymentController(
             CustomerPaymentService customerPaymentService,
-            CustomerPaymentProperties properties) {
+            CustomerPaymentProperties properties,
+            PacsMessageService pacsMessageService) {
 
         this.customerPaymentService = customerPaymentService;
         this.properties = properties;
+        this.pacsMessageService = pacsMessageService;
     }
 
     /**
@@ -97,5 +103,42 @@ public class CustomerPaymentController {
                         customerPaymentService.ownTransaction(transactionReference)
                 )
         );
+    }
+
+    /**
+     * The scheme messages behind one of the customer's own payments.
+     *
+     * Ownership is established from the payment first, so a customer sees the
+     * messages for their money and no one else's. It is their payment: they are
+     * entitled to see what was actually sent on their behalf.
+     */
+    @GetMapping("/transactions/{transactionReference}/messages")
+    public ResponseEntity<List<PacsMessage>> messages(
+            @PathVariable String transactionReference) {
+
+        customerPaymentService.ownTransaction(transactionReference);
+
+        return ResponseEntity.ok(
+                pacsMessageService.findForTransaction(transactionReference)
+        );
+    }
+
+    /**
+     * One message body.
+     *
+     * The message is located first and the payment it belongs to is then
+     * checked, so a guessed message id is refused rather than answered.
+     */
+    @GetMapping(
+            value = "/messages/{messageId}/xml",
+            produces = MediaType.APPLICATION_XML_VALUE
+    )
+    public ResponseEntity<String> messageXml(@PathVariable String messageId) {
+
+        PacsMessage message = pacsMessageService.findByMessageId(messageId);
+
+        customerPaymentService.ownTransaction(message.getTransactionReference());
+
+        return ResponseEntity.ok(message.getRawXml());
     }
 }
