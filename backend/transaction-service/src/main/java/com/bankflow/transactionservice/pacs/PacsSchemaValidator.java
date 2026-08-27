@@ -54,7 +54,7 @@ public class PacsSchemaValidator {
             String xml) {
 
         return validateAgainst(
-                BASE + rail + "/" + messageType.getIdentifier() + ".xsd",
+                BASE + rail + "/" + messageType.getIdentifier(rail) + ".xsd",
                 xml
         );
     }

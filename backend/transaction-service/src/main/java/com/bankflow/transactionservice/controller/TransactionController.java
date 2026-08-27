@@ -47,12 +47,12 @@ public class TransactionController {
     }
 
     /*
-     * Restricted to bank staff for now.
+     * Staff only, permanently.
      *
-     * Customer-initiated transfers arrive with pain.001 support, which needs
-     * per-account ownership checks that do not exist yet. Until then, allowing
-     * CUSTOMER here would let any authenticated customer move money out of any
-     * account by ID.
+     * This endpoint can debit any account by id, which is what a teller at the
+     * counter needs and exactly what a customer must never have. Customers pay
+     * through /api/my/payments, which resolves the accounts they own and
+     * refuses anything else.
      */
     @PostMapping("/transfers")
     public ResponseEntity<TransactionResponse> createTransfer(
