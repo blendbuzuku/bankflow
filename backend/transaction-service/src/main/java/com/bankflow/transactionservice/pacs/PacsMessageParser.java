@@ -126,9 +126,159 @@ public class PacsMessageParser {
             return parseStatusReport(statusReport);
         }
 
+        Element paymentReturn = firstByLocalName(root, "PmtRtr");
+
+        if (paymentReturn != null) {
+            return parseReturn(paymentReturn);
+        }
+
+        Element cancellation = firstByLocalName(root, "FIToFIPmtCxlReq");
+
+        if (cancellation != null) {
+            return parseCancellationRequest(cancellation);
+        }
+
         throw new BusinessException(
-                "Unsupported message: expected a pacs.008 or pacs.002 payload"
+                "Unsupported message: expected a pacs.008, pacs.002, pacs.004 "
+                        + "or camt.056 payload"
         );
+    }
+
+    /**
+     * A payment coming back.
+     *
+     * The identifiers we match on are the original payment's, not the return's:
+     * RtrId names this return, while OrgnlTxId and OrgnlEndToEndId name what is
+     * being undone, which is the payment on our books.
+     */
+    private ParsedMessage parseReturn(Element body) {
+
+        Element groupHeader = firstByLocalName(body, "GrpHdr");
+        Element transaction = firstByLocalName(body, "TxInf");
+
+        if (transaction == null) {
+            throw new BusinessException(
+                    "pacs.004 contains no returned transaction"
+            );
+        }
+
+        Element originalGroup = firstByLocalName(transaction, "OrgnlGrpInf");
+        Element returnReason = firstByLocalName(transaction, "RtrRsnInf");
+
+        /*
+         * The returned amount is what actually comes back, which need not be
+         * the original amount — a bank may keep its charges. That figure, not
+         * the original, is what we credit.
+         */
+        Element returnedAmount =
+                firstByLocalName(transaction, "RtrdIntrBkSttlmAmt");
+
+        String transactionId = textOf(transaction, "OrgnlUETR");
+
+        if (transactionId == null) {
+            transactionId = textOf(transaction, "OrgnlTxId");
+        }
+
+        Element originalRef = firstByLocalName(transaction, "OrgnlTxRef");
+        Element debtor = firstByLocalName(originalRef, "Dbtr");
+        Element debtorAccount = firstByLocalName(originalRef, "DbtrAcct");
+        Element creditor = firstByLocalName(originalRef, "Cdtr");
+        Element creditorAccount = firstByLocalName(originalRef, "CdtrAcct");
+
+        return new ParsedMessage(
+                PacsMessageType.PACS_004,
+                textOf(groupHeader, "MsgId"),
+                textOf(transaction, "OrgnlEndToEndId"),
+                transactionId,
+                textOf(originalGroup, "OrgnlMsgId"),
+                null,
+                reasonOf(returnReason),
+                textOf(debtor, "Nm"),
+                textOf(debtorAccount, "IBAN"),
+                null,
+                textOf(creditor, "Nm"),
+                textOf(creditorAccount, "IBAN"),
+                null,
+                returnedAmount == null
+                        ? null
+                        : new BigDecimal(returnedAmount.getTextContent().trim()),
+                returnedAmount == null
+                        ? null
+                        : returnedAmount.getAttribute("Ccy"),
+                null
+        );
+    }
+
+    /** Another bank asking for a payment it sent us to be sent back. */
+    private ParsedMessage parseCancellationRequest(Element body) {
+
+        Element assignment = firstByLocalName(body, "Assgnmt");
+        Element transaction = firstByLocalName(body, "TxInf");
+
+        if (transaction == null) {
+            throw new BusinessException(
+                    "camt.056 contains no underlying transaction"
+            );
+        }
+
+        Element originalGroup = firstByLocalName(transaction, "OrgnlGrpInf");
+        Element cancellationReason = firstByLocalName(transaction, "CxlRsnInf");
+        Element amount =
+                firstByLocalName(transaction, "OrgnlIntrBkSttlmAmt");
+
+        String transactionId = textOf(transaction, "OrgnlUETR");
+
+        if (transactionId == null) {
+            transactionId = textOf(transaction, "OrgnlTxId");
+        }
+
+        Element originalRef = firstByLocalName(transaction, "OrgnlTxRef");
+        Element debtor = firstByLocalName(originalRef, "Dbtr");
+        Element debtorAccount = firstByLocalName(originalRef, "DbtrAcct");
+        Element creditor = firstByLocalName(originalRef, "Cdtr");
+        Element creditorAccount = firstByLocalName(originalRef, "CdtrAcct");
+
+        return new ParsedMessage(
+                PacsMessageType.CAMT_056,
+                textOf(assignment, "Id"),
+                textOf(transaction, "OrgnlEndToEndId"),
+                transactionId,
+                textOf(originalGroup, "OrgnlMsgId"),
+                null,
+                reasonOf(cancellationReason),
+                textOf(debtor, "Nm"),
+                textOf(debtorAccount, "IBAN"),
+                null,
+                textOf(creditor, "Nm"),
+                textOf(creditorAccount, "IBAN"),
+                null,
+                amount == null
+                        ? null
+                        : new BigDecimal(amount.getTextContent().trim()),
+                amount == null ? null : amount.getAttribute("Ccy"),
+                textOf(cancellationReason, "AddtlInf")
+        );
+    }
+
+    /**
+     * Reads a reason code we recognise. An unknown code is not a parse failure
+     * — the counterparty may use one outside our list, and the message is still
+     * actionable without it.
+     */
+    private ReasonCode reasonOf(Element reasonInfo) {
+
+        Element reason = firstByLocalName(reasonInfo, "Rsn");
+        String code = textOf(reason, "Cd");
+
+        if (code == null) {
+            return null;
+        }
+
+        try {
+            return ReasonCode.valueOf(code.trim().toUpperCase());
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
     }
 
     private ParsedMessage parseCreditTransfer(Element body, String xml) {

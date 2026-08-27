@@ -52,4 +52,22 @@ public record ParsedMessage(
     public boolean isStatusReport() {
         return messageType == PacsMessageType.PACS_002;
     }
+
+    /** A settled payment coming back to us. */
+    public boolean isReturn() {
+        return messageType == PacsMessageType.PACS_004;
+    }
+
+    /** A request that we send a payment back. */
+    public boolean isCancellationRequest() {
+        return messageType == PacsMessageType.CAMT_056;
+    }
+
+    /**
+     * Whether this message answers something rather than asks it. Answers are
+     * recorded, never answered — replying to one invites a loop.
+     */
+    public boolean isAnswer() {
+        return isStatusReport() || isReturn();
+    }
 }
