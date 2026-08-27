@@ -36,6 +36,9 @@ public enum AuditEventType {
     PACS_MESSAGE_GENERATED,
     PACS_MESSAGE_RECEIVED,
 
+    /** The list of banks that can be paid was changed. */
+    BANK_DIRECTORY_CHANGED,
+
     TARIFF_RULE_CREATED,
     TARIFF_RULE_CHANGED
 }
