@@ -12,25 +12,134 @@
 
       <nav class="nav">
         @if (isStaff()) {
-          <a routerLink="/overview" routerLinkActive="active">Overview</a>
-          <a routerLink="/clients" routerLinkActive="active">Clients</a>
-          <a routerLink="/payments/new" routerLinkActive="active">New payment</a>
-          <a routerLink="/approvals" routerLinkActive="active">
-            Approvals
-            @if (pendingCount() > 0) { <span class="badge">{{ pendingCount() }}</span> }
-          </a>
-          <a routerLink="/recalls" routerLinkActive="active">
-            Recalls
-            @if (recallCount() > 0) { <span class="badge">{{ recallCount() }}</span> }
-          </a>
-          <a routerLink="/statements" routerLinkActive="active">Statements</a>
-          @if (canApprove()) {
-            <a routerLink="/banks" routerLinkActive="active">Banks</a>
-            <a routerLink="/end-of-day" routerLinkActive="active">End of day</a>
-          }
+
+          <!--
+            Four areas, grouped by the job being done rather than by which
+            service happens to serve them: the counter, moving money, the
+            scheme interface, and what the books say.
+          -->
+
+          <div class="menu" [class.open]="openMenu() === 'banking'">
+            <button type="button" class="menu-trigger"
+                    (click)="toggleMenu('banking', $event)"
+                    [attr.aria-expanded]="openMenu() === 'banking'">
+              Banking
+              <span class="caret" aria-hidden="true"></span>
+            </button>
+
+            @if (openMenu() === 'banking') {
+              <div class="panel">
+                <a routerLink="/overview" routerLinkActive="active">
+                  <strong>Overview</strong>
+                  <span>What needs attention today</span>
+                </a>
+                <a routerLink="/clients" routerLinkActive="active">
+                  <strong>Clients and accounts</strong>
+                  <span>Approve clients, open accounts, handle cash</span>
+                </a>
+              </div>
+            }
+          </div>
+
+          <div class="menu" [class.open]="openMenu() === 'payments'">
+            <button type="button" class="menu-trigger"
+                    (click)="toggleMenu('payments', $event)"
+                    [attr.aria-expanded]="openMenu() === 'payments'">
+              Payments
+              @if (paymentsBadge() > 0) {
+                <span class="badge">{{ paymentsBadge() }}</span>
+              }
+              <span class="caret" aria-hidden="true"></span>
+            </button>
+
+            @if (openMenu() === 'payments') {
+              <div class="panel">
+                <a routerLink="/payments/new" routerLinkActive="active">
+                  <strong>New payment</strong>
+                  <span>Price it, preview the message, send it</span>
+                </a>
+                <a routerLink="/approvals" routerLinkActive="active">
+                  <strong>
+                    Approvals
+                    @if (pendingCount() > 0) {
+                      <span class="badge">{{ pendingCount() }}</span>
+                    }
+                  </strong>
+                  <span>Payments waiting for a second person</span>
+                </a>
+                <a routerLink="/recalls" routerLinkActive="active">
+                  <strong>
+                    Recalls
+                    @if (recallCount() > 0) {
+                      <span class="badge">{{ recallCount() }}</span>
+                    }
+                  </strong>
+                  <span>Requests to send a settled payment back</span>
+                </a>
+              </div>
+            }
+          </div>
+
+          <div class="menu" [class.open]="openMenu() === 'scheme'">
+            <button type="button" class="menu-trigger"
+                    (click)="toggleMenu('scheme', $event)"
+                    [attr.aria-expanded]="openMenu() === 'scheme'">
+              Scheme
+              <span class="caret" aria-hidden="true"></span>
+            </button>
+
+            @if (openMenu() === 'scheme') {
+              <div class="panel">
+                <a routerLink="/messages" routerLinkActive="active">
+                  <strong>Messages</strong>
+                  <span>Everything exchanged with KIPS, in plain English</span>
+                </a>
+                @if (canApprove()) {
+                  <a routerLink="/banks" routerLinkActive="active">
+                    <strong>Bank directory</strong>
+                    <span>The banks money can be sent to</span>
+                  </a>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="menu" [class.open]="openMenu() === 'reporting'">
+            <button type="button" class="menu-trigger"
+                    (click)="toggleMenu('reporting', $event)"
+                    [attr.aria-expanded]="openMenu() === 'reporting'">
+              Reporting
+              <span class="caret" aria-hidden="true"></span>
+            </button>
+
+            @if (openMenu() === 'reporting') {
+              <div class="panel">
+                <a routerLink="/statements" routerLinkActive="active">
+                  <strong>Statements</strong>
+                  <span>What an account did over a period</span>
+                </a>
+                @if (canApprove()) {
+                  <a routerLink="/end-of-day" routerLinkActive="active">
+                    <strong>End of day</strong>
+                    <span>Prove the books and close the day</span>
+                  </a>
+                }
+              </div>
+            }
+          </div>
+
         } @else {
-          <a routerLink="/dashboard" routerLinkActive="active">My banking</a>
-          <a routerLink="/statements" routerLinkActive="active">Statements</a>
+
+          <!--
+            A customer has two places to be. Folding two links into menus
+            would be structure for its own sake.
+          -->
+          <a class="plain" routerLink="/dashboard" routerLinkActive="active">
+            My banking
+          </a>
+          <a class="plain" routerLink="/statements" routerLinkActive="active">
+            Statements
+          </a>
         }
       </nav>
 
@@ -44,6 +153,8 @@
 
     </div>
   </header>
+
+  <app-breadcrumbs />
 }
 
 <main [class.with-chrome]="showChrome()">
@@ -51,3 +162,4 @@
 </main>
 
 <app-toast-stack />
+<app-confirm-dialog />

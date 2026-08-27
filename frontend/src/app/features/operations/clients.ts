@@ -10,6 +10,7 @@ import {
   Currency,
 } from '../../core/services/account';
 import { TransactionService } from '../../core/services/transaction';
+import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 import { Toasts } from '../../core/services/toasts';
 
 /**
@@ -27,7 +28,22 @@ import { Toasts } from '../../core/services/toasts';
   templateUrl: './clients.html',
   styleUrl: './clients.css',
 })
-export class Clients implements OnInit {
+export class Clients implements OnInit, HasUnsavedChanges {
+
+  /** A half-filled account or cash form is work that would be lost. */
+  hasUnsavedChanges(): boolean {
+
+    if (this.busy()) {
+      return false;
+    }
+
+    return !!(this.newAccountClientId
+      || this.newAccountPurpose.trim()
+      || this.cashAccountId
+      || this.cashAmount
+      || this.cashNarrative.trim());
+  }
+
 
   private readonly accountService = inject(AccountService);
   private readonly transactionService = inject(TransactionService);

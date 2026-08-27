@@ -7,6 +7,7 @@ import { PaymentForm } from './features/payments/payment-form';
 import { PaymentDetail } from './features/payments/payment-detail';
 import { ApprovalQueue } from './features/payments/approval-queue';
 import { RecallQueue } from './features/payments/recall-queue';
+import { MessageInspector } from './features/payments/message-inspector';
 import { Statements } from './features/statements/statements';
 import { Overview } from './features/operations/overview';
 import { Clients } from './features/operations/clients';
@@ -14,6 +15,7 @@ import { EndOfDay } from './features/operations/end-of-day';
 import { Banks } from './features/operations/banks';
 
 import { authGuard } from './core/guards/auth-guard';
+import { unsavedChangesGuard } from './core/guards/unsaved-changes';
 import {
   customerGuard,
   landingGuard,
@@ -38,6 +40,8 @@ export const routes: Routes = [
     path: 'dashboard',
     component: Dashboard,
     canActivate: [customerGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: { title: 'My banking' },
   },
 
   // --- staff ---
@@ -46,12 +50,18 @@ export const routes: Routes = [
     path: 'overview',
     component: Overview,
     canActivate: [staffGuard],
+    data: { section: 'Banking', title: 'Overview' },
   },
 
   {
     path: 'clients',
     component: Clients,
     canActivate: [staffGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: {
+      section: 'Banking', sectionPath: '/overview',
+      title: 'Clients and accounts',
+    },
   },
 
   /*
@@ -62,18 +72,31 @@ export const routes: Routes = [
     path: 'payments/new',
     component: PaymentForm,
     canActivate: [staffGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: {
+      section: 'Payments', sectionPath: '/payments/new',
+      title: 'New payment',
+    },
   },
 
   {
     path: 'payments/:reference',
     component: PaymentDetail,
     canActivate: [staffGuard],
+    data: {
+      section: 'Payments', sectionPath: '/payments/new',
+      title: 'Payment', titleParam: 'reference',
+    },
   },
 
   {
     path: 'approvals',
     component: ApprovalQueue,
     canActivate: [staffGuard],
+    data: {
+      section: 'Payments', sectionPath: '/payments/new',
+      title: 'Approvals',
+    },
   },
 
   /*
@@ -84,6 +107,26 @@ export const routes: Routes = [
     path: 'recalls',
     component: RecallQueue,
     canActivate: [staffGuard],
+    data: {
+      section: 'Payments', sectionPath: '/payments/new',
+      title: 'Recalls',
+    },
+  },
+
+  /*
+   * Reading the traffic is how a scheme problem gets diagnosed, so any member
+   * of staff can, but a message quotes both parties' business and so is not
+   * a customer's to browse.
+   */
+  {
+    path: 'messages',
+    component: MessageInspector,
+    canActivate: [staffGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: {
+      section: 'Scheme', sectionPath: '/messages',
+      title: 'Messages',
+    },
   },
 
   /*
@@ -94,6 +137,11 @@ export const routes: Routes = [
     path: 'banks',
     component: Banks,
     canActivate: [supervisorGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: {
+      section: 'Scheme', sectionPath: '/messages',
+      title: 'Bank directory',
+    },
   },
 
   // Closing the books is a supervisor's job, not a teller's.
@@ -101,6 +149,10 @@ export const routes: Routes = [
     path: 'end-of-day',
     component: EndOfDay,
     canActivate: [supervisorGuard],
+    data: {
+      section: 'Reporting', sectionPath: '/statements',
+      title: 'End of day',
+    },
   },
 
   /*
@@ -111,6 +163,7 @@ export const routes: Routes = [
     path: 'statements',
     component: Statements,
     canActivate: [authGuard],
+    data: { section: 'Reporting', title: 'Statements' },
   },
 
   { path: '**', redirectTo: '' },

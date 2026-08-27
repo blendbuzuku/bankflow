@@ -12,6 +12,8 @@ import {
   Currency,
 } from '../../core/services/account';
 import { Onboarding } from './onboarding';
+import { MessageView } from '../../shared/message-view';
+import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 import { Toasts } from '../../core/services/toasts';
 import {
   BankDirectoryService,
@@ -19,6 +21,7 @@ import {
 } from '../../core/services/bank-directory';
 import {
   CustomerLimits,
+  PacsMessage,
   PaymentTypeCode,
   RAILS,
   TransactionResponse,
@@ -35,11 +38,32 @@ import {
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [DecimalPipe, DatePipe, FormsModule, Onboarding],
+  imports: [DecimalPipe, DatePipe, FormsModule, Onboarding, MessageView],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css',
 })
-export class Dashboard implements OnInit {
+export class Dashboard implements OnInit, HasUnsavedChanges {
+
+  /**
+   * A payment the customer has started but not sent.
+   *
+   * Nothing is at stake unless the form is actually open, so a closed one
+   * never asks — the fields keep their values behind it and are cleared on
+   * send anyway.
+   */
+  hasUnsavedChanges(): boolean {
+
+    if (!this.showForm() || this.sending()) {
+      return false;
+    }
+
+    return !!(this.amount
+      || this.creditorName.trim()
+      || this.creditorIban.trim()
+      || this.remittanceInformation.trim()
+      || this.destinationAccountId);
+  }
+
 
   private readonly authService = inject(AuthService);
   private readonly accountService = inject(AccountService);
@@ -139,6 +163,98 @@ export class Dashboard implements OnInit {
     }
 
     return [...totals].map(([currency, total]) => ({ currency, total }));
+  }
+
+  // --- recent activity ---
+
+  /**
+   * How much history is on screen at once.
+   *
+   * A statement is where you go to read everything; this is the "what has
+   * happened lately" list, and a hundred rows of it answers a question nobody
+   * asked while burying the two that matter.
+   */
+  private static readonly RECENT = 8;
+
+  readonly showAllHistory = signal(false);
+
+  visibleHistory(): TransactionResponse[] {
+
+    return this.showAllHistory()
+      ? this.history()
+      : this.history().slice(0, Dashboard.RECENT);
+  }
+
+  hiddenCount(): number {
+    return Math.max(0, this.history().length - Dashboard.RECENT);
+  }
+
+  toggleHistory(): void {
+
+    this.showAllHistory.set(!this.showAllHistory());
+
+    // A collapsed list must not leave an expanded message stranded below it.
+    this.openMessageFor.set(null);
+    this.messageXml.set('');
+  }
+
+  // --- the message behind a payment ---
+
+  readonly openMessageFor = signal<string | null>(null);
+  readonly messageXml = signal('');
+  readonly messageError = signal('');
+
+  /**
+   * Shows what was actually sent on the customer's behalf.
+   *
+   * A payment that leaves the bank becomes an ISO 20022 message, and it is the
+   * customer's own money — there is no reason to keep the record of it from
+   * them. An internal transfer has none, so nothing is offered for one.
+   */
+  toggleMessage(transaction: TransactionResponse): void {
+
+    const reference = transaction.transactionReference;
+
+    if (this.openMessageFor() === reference) {
+      this.openMessageFor.set(null);
+      this.messageXml.set('');
+      return;
+    }
+
+    this.openMessageFor.set(reference);
+    this.messageXml.set('');
+    this.messageError.set('');
+
+    this.transactionService.myMessages(reference).subscribe({
+      next: messages => {
+
+        /*
+         * The credit transfer is the payment itself, whichever way it went —
+         * ours going out, or theirs coming in. Picking by direction instead
+         * would show the status report we sent back for money we received,
+         * which answers a question nobody asked.
+         */
+        const payment = messages.find(m => m.messageType === 'PACS_008')
+          ?? messages[0];
+
+        if (!payment) {
+          this.messageError.set('No scheme message was sent for this payment.');
+          return;
+        }
+
+        this.transactionService.myMessageXml(payment.messageId).subscribe({
+          next: xml => this.messageXml.set(xml),
+          error: () => this.messageError.set('The message could not be loaded.'),
+        });
+      },
+      error: () => this.messageError.set('The message could not be loaded.'),
+    });
+  }
+
+  /** Only a payment that left the bank has a scheme message behind it. */
+  hasMessage(transaction: TransactionResponse): boolean {
+    return transaction.paymentType !== 'INTERNAL'
+      && transaction.transactionType === 'TRANSFER';
   }
 
   /**

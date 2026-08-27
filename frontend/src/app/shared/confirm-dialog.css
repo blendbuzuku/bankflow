@@ -1,0 +1,85 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+
+  display: grid;
+  place-items: center;
+  padding: 24px;
+
+  background: rgba(15, 23, 42, .42);
+  animation: fade .12s ease-out;
+}
+
+.dialog {
+  width: min(430px, 100%);
+  padding: 22px 24px 20px;
+
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
+
+  animation: rise .14s ease-out;
+}
+
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop, .dialog { animation: none; }
+}
+
+.dialog h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.dialog p {
+  margin: 0 0 20px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #64748b;
+  max-width: 48ch;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.actions button {
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.actions .cancel {
+  background: #eef2f8;
+  color: #1e3a5f;
+  border: 1px solid #d9e1ec;
+}
+
+.actions .cancel:hover { background: #e2e8f0; }
+
+.actions .primary { background: #1565c0; color: #fff; }
+.actions .primary:hover { background: #0d47a1; }
+
+.actions .danger { background: #b91c1c; color: #fff; }
+.actions .danger:hover { background: #991b1b; }
+
+.actions button:focus-visible {
+  outline: 2px solid #1565c0;
+  outline-offset: 2px;
+}

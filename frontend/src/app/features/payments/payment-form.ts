@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Toasts } from '../../core/services/toasts';
+import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 import {
   BankDirectoryService,
   CorrespondentBank,
@@ -39,7 +40,30 @@ import {
   templateUrl: './payment-form.html',
   styleUrl: './payment-form.css',
 })
-export class PaymentForm implements OnInit {
+export class PaymentForm implements OnInit, HasUnsavedChanges {
+
+  /**
+   * Whether leaving would throw away work.
+   *
+   * Only the fields somebody had to type count. A rail and a currency arrive
+   * with defaults, so treating them as entered would question every
+   * navigation and teach people to dismiss the warning unread.
+   */
+  hasUnsavedChanges(): boolean {
+
+    if (this.submitting()) {
+      return false;
+    }
+
+    return !!(this.amount
+      || this.creditorName.trim()
+      || this.creditorIban.trim()
+      || this.debtorName.trim()
+      || this.remittanceInformation.trim()
+      || this.sourceAccountId
+      || this.destinationAccountId);
+  }
+
 
   private readonly accountService = inject(AccountService);
   private readonly transactionService = inject(TransactionService);

@@ -69,7 +69,7 @@
   min-width: 0;
 }
 
-.nav a {
+.nav a.plain {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -83,15 +83,122 @@
   transition: background .15s, color .15s;
 }
 
-.nav a:hover {
+.nav a.plain:hover {
   background: #f1f5f9;
   color: #0f172a;
 }
 
-.nav a.active {
+.nav a.plain.active {
   background: #e7f0fb;
   color: #1565c0;
   font-weight: 600;
+}
+
+/* --- grouped menus --- */
+
+.menu { position: relative; }
+
+.menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.menu-trigger:hover { background: #f1f5f9; color: #0f172a; }
+
+.menu.open .menu-trigger {
+  background: #e7f0fb;
+  color: #1565c0;
+  font-weight: 600;
+}
+
+.menu-trigger:focus-visible {
+  outline: 2px solid #1565c0;
+  outline-offset: 1px;
+}
+
+.caret {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  opacity: .55;
+  transition: transform .15s;
+}
+
+.menu.open .caret { transform: rotate(180deg); opacity: 1; }
+
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 90;
+
+  min-width: 268px;
+  padding: 6px;
+
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 11px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .14);
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  animation: menu-in .12s ease-out;
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel { animation: none; }
+}
+
+.panel a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background .12s;
+}
+
+.panel a:hover { background: #f8fafc; }
+
+.panel a.active { background: #e7f0fb; }
+
+.panel a strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.panel a.active strong { color: #1565c0; }
+
+.panel a span {
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.4;
 }
 
 .badge {

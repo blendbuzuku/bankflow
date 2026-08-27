@@ -6,6 +6,7 @@ import {
   CorrespondentBank,
 } from '../../core/services/bank-directory';
 import { Toasts } from '../../core/services/toasts';
+import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 
 /**
  * The banks this bank can pay.
@@ -20,7 +21,20 @@ import { Toasts } from '../../core/services/toasts';
   templateUrl: './banks.html',
   styleUrl: './banks.css',
 })
-export class Banks implements OnInit {
+export class Banks implements OnInit, HasUnsavedChanges {
+
+  /** A bank being added or renamed, not yet saved. */
+  hasUnsavedChanges(): boolean {
+
+    if (this.busy()) {
+      return false;
+    }
+
+    return !!(this.newBic.trim()
+      || this.newName.trim()
+      || this.renaming() !== null);
+  }
+
 
   private readonly directory = inject(BankDirectoryService);
   private readonly toasts = inject(Toasts);
