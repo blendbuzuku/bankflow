@@ -33,6 +33,20 @@ public interface TransactionRepository
     /** The approval queue, oldest first so nothing waits indefinitely. */
     List<Transaction> findByStatusOrderByCreatedAtAsc(TransactionStatus status);
 
+    /** Everything booked on one day, for the end-of-day summary. */
+    List<Transaction> findByBookingDate(java.time.LocalDate bookingDate);
+
+    /**
+     * Money that has left the debtor but not yet been answered for.
+     *
+     * These are the payments sitting in suspense: sent to the scheme, awaiting
+     * a status report. They are the difference between the bank's books and
+     * its position with KIPS, so they are what somebody closing the day needs
+     * to see.
+     */
+    List<Transaction> findByStatusOrderByCreatedAtDesc(TransactionStatus status);
+
+
     /**
      * Payments touching any of a set of accounts, either side.
      *
