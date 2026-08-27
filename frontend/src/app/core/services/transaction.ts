@@ -180,6 +180,91 @@ export interface StatementResponse {
   entries: StatementEntry[];
 }
 
+/** One scheme message in the traffic log, without its body. */
+export interface MessageSummary {
+  messageId: string;
+  messageType: string;
+  description: string;
+  direction: 'OUTBOUND' | 'INBOUND';
+  status: string;
+  transactionReference: string | null;
+  endToEndId: string | null;
+  statusCode: string | null;
+  reasonCode: string | null;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+/** A definition present in the traffic, and what it means. */
+export interface MessageTypeOption {
+  name: string;
+  identifier: string;
+  description: string;
+  count: number;
+}
+
+export interface MessageSearch {
+  q?: string;
+  type?: string;
+  direction?: string;
+  limit?: number;
+}
+
+// --- end of day ---
+
+export interface DayActivityLine {
+  label: string;
+  count: number;
+  total: number;
+  fees: number;
+}
+
+export interface InFlightPayment {
+  transactionReference: string;
+  amount: number;
+  currency: string;
+  beneficiary: string | null;
+  bookingDate: string;
+  ageInDays: number;
+}
+
+export interface OutstandingItem {
+  kind: string;
+  count: number;
+  description: string;
+  where: string;
+}
+
+export interface DaySummary {
+  bookingDate: string;
+  closed: boolean;
+  activity: DayActivityLine[];
+  inFlight: InFlightPayment[];
+  outstanding: OutstandingItem[];
+}
+
+export interface DayCloseRecord {
+  bookingDate: string;
+  closedByUsername: string;
+  closedAt: string;
+  balanced: boolean;
+  reconciled: boolean;
+  entryCount: number;
+  totalDebits: number;
+  totalCredits: number;
+  matchedMovements: number;
+  summary: string;
+}
+
+export interface DayCloseResult {
+  bookingDate: string;
+  closed: boolean;
+  trialBalance: TrialBalance;
+  reconciliation: Reconciliation;
+  summary: string;
+  record: DayCloseRecord | null;
+}
+
 export interface CustomerLimits {
   selfServiceEnabled: boolean;
   permittedRails: PaymentTypeCode[];
@@ -386,14 +471,64 @@ export class TransactionService {
     );
   }
 
-  closeDay(date?: string): Observable<DayClose> {
-    return this.http.post<DayClose>(
+  /**
+   * Signs the day off. A day that does not prove is not closed, and the
+   * result says so rather than failing.
+   */
+  closeDay(date?: string): Observable<DayCloseResult> {
+    return this.http.post<DayCloseResult>(
       `/api/end-of-day/close${date ? '?date=' + date : ''}`,
       {},
     );
   }
 
   // --- approvals ---------------------------------------------------------
+
+  /**
+   * Finds messages by whatever the person knows — an IBAN, a name, an amount,
+   * a reference. A blank search returns the most recent traffic.
+   */
+  searchMessages(search: MessageSearch = {}): Observable<MessageSummary[]> {
+
+    const params = new URLSearchParams();
+
+    if (search.q?.trim()) { params.set('q', search.q.trim()); }
+    if (search.type) { params.set('type', search.type); }
+    if (search.direction) { params.set('direction', search.direction); }
+
+    params.set('limit', String(search.limit ?? 100));
+
+    return this.http.get<MessageSummary[]>(`/api/messages?${params}`);
+  }
+
+  /** The scheme messages behind one of the customer's own payments. */
+  myMessages(reference: string): Observable<PacsMessage[]> {
+    return this.http.get<PacsMessage[]>(
+      `/api/my/transactions/${encodeURIComponent(reference)}/messages`,
+    );
+  }
+
+  myMessageXml(messageId: string): Observable<string> {
+    return this.http.get(
+      `/api/my/messages/${encodeURIComponent(messageId)}/xml`,
+      { responseType: 'text' },
+    );
+  }
+
+  /** Which definitions are actually present, with what each one means. */
+  messageTypes(): Observable<MessageTypeOption[]> {
+    return this.http.get<MessageTypeOption[]>('/api/messages/types');
+  }
+
+  /** What the day consisted of, and what is still open. */
+  daySummary(date: string): Observable<DaySummary> {
+    return this.http.get<DaySummary>(`/api/end-of-day/summary?date=${date}`);
+  }
+
+  /** The recent run of days and whether each one closed. */
+  dayHistory(): Observable<DayCloseRecord[]> {
+    return this.http.get<DayCloseRecord[]>('/api/end-of-day/history');
+  }
 
   // --- statements ---
 

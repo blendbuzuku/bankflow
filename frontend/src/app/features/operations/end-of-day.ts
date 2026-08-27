@@ -1,10 +1,13 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 import { Toasts } from '../../core/services/toasts';
 
 import {
+  DayCloseRecord,
+  DaySummary,
   Reconciliation,
   ReconciliationBreak,
   TransactionService,
@@ -22,7 +25,7 @@ import {
  */
 @Component({
   selector: 'app-end-of-day',
-  imports: [DecimalPipe, FormsModule],
+  imports: [DecimalPipe, DatePipe, FormsModule, RouterLink],
   templateUrl: './end-of-day.html',
   styleUrl: './end-of-day.css',
 })
@@ -39,11 +42,51 @@ export class EndOfDay implements OnInit {
   readonly error = signal('');
   readonly closeResult = signal<string>('');
 
+  // --- what the day consisted of ---
+
+  readonly summary = signal<DaySummary | null>(null);
+  readonly history = signal<DayCloseRecord[]>([]);
+  readonly closeRecord = signal<DayCloseRecord | null>(null);
+
   /** Defaults to today, but any past day can be re-proved. */
   date = new Date().toISOString().slice(0, 10);
 
   ngOnInit(): void {
     this.load();
+  }
+
+  /** Whether the day has already been signed off and sealed. */
+  isClosed(): boolean {
+    return !!this.summary()?.closed;
+  }
+
+  /** Money gone from a debtor and not yet answered for by the scheme. */
+  inFlightTotal(): number {
+    return (this.summary()?.inFlight ?? [])
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+  }
+
+  /** A payment in flight for days usually means an answer that never came. */
+  isStale(ageInDays: number): boolean {
+    return ageInDays >= 2;
+  }
+
+  private loadSummary(date: string): void {
+
+    this.transactionService.daySummary(date).subscribe({
+      next: summary => this.summary.set(summary),
+      error: () => this.summary.set(null),
+    });
+
+    this.transactionService.dayHistory().subscribe({
+      next: history => {
+        this.history.set(history);
+        this.closeRecord.set(
+          history.find(d => d.bookingDate === date) ?? null,
+        );
+      },
+      error: () => this.history.set([]),
+    });
   }
 
   load(): void {
@@ -68,6 +111,8 @@ export class EndOfDay implements OnInit {
       next: result => this.reconciliation.set(result),
       error: () => this.reconciliation.set(null),
     });
+
+    this.loadSummary(this.date);
   }
 
   close(): void {
@@ -81,34 +126,34 @@ export class EndOfDay implements OnInit {
         this.closing.set(false);
         this.trialBalance.set(result.trialBalance);
         this.reconciliation.set(result.reconciliation);
-
-        this.closeResult.set(
-          result.closed
-            ? `${result.bookingDate} closed. Both proofs passed and the outcome is recorded.`
-            : `${result.bookingDate} did not close. The outcome is recorded and the breaks are listed below.`,
-        );
+        this.closeResult.set(result.summary);
+        this.closeRecord.set(result.record);
 
         /*
-         * A day that would not close is not an error — the close ran, and its
-         * answer was no. Reported as a warning the user must dismiss, because
-         * unbalanced books are the one thing that must not scroll past.
+         * A day that would not close is not an error — the close ran and its
+         * answer was no. It is reported as something to act on rather than
+         * something that went wrong.
          */
         if (result.closed) {
           this.toasts.success(
             `${result.bookingDate} closed`,
-            'Trial balance nets to zero and reconciliation found no breaks.',
+            result.summary,
           );
         } else {
           this.toasts.error(
             `${result.bookingDate} did not close`,
-            'The books do not prove out. The breaks are listed on the page.',
+            result.summary,
           );
         }
+
+        this.loadSummary(this.date);
       },
-      error: () => {
+      error: error => {
         this.closing.set(false);
-        this.error.set('The day could not be closed.');
-        this.toasts.error('The day could not be closed');
+        this.error.set(
+          error?.error?.message ?? 'The day could not be closed.',
+        );
+        this.toasts.failure('The day could not be closed', error);
       },
     });
   }

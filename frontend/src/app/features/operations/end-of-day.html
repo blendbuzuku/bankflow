@@ -8,9 +8,17 @@
 
     <div class="controls">
       <input type="date" name="date" [(ngModel)]="date" (ngModelChange)="load()" />
-      <button type="button" class="primary" (click)="close()" [disabled]="closing()">
-        @if (closing()) { Closing... } @else { Close day }
-      </button>
+      @if (isClosed()) {
+        <span class="sealed">Closed</span>
+      } @else {
+        <button type="button" class="primary" (click)="close()"
+                [disabled]="closing() || !isClean()"
+                [attr.title]="isClean()
+                  ? 'Sign the day off. Nothing can be booked into it afterwards.'
+                  : 'The books do not prove yet, so the day cannot be closed.'">
+          @if (closing()) { Closing... } @else { Close day }
+        </button>
+      }
     </div>
   </header>
 
@@ -36,6 +44,113 @@
         }
       </span>
     </div>
+
+    @if (closeRecord(); as rec) {
+      <div class="card sealed-card">
+        <span class="sealed-title">
+          Signed off by {{ rec.closedByUsername }}
+          on {{ rec.closedAt | date: 'dd MMM yyyy HH:mm' }}
+        </span>
+        <p class="sealed-note">{{ rec.summary }}</p>
+        <p class="sealed-note quiet">
+          These are the figures as accepted at the time. Nothing further can be
+          booked into this day.
+        </p>
+      </div>
+    }
+
+    @if (summary(); as day) {
+
+      @if (day.outstanding.length) {
+        <section class="card outstanding-card">
+          <h2>Before you close</h2>
+          <p class="explain">
+            None of these stops the day closing — a parked payment has moved no
+            money. They are listed so the decision is made knowing what is
+            still open.
+          </p>
+          <ul class="outstanding">
+            @for (o of day.outstanding; track o.kind) {
+              <li>
+                <!--
+                  The description already opens with the number, so a badge
+                  beside it would say the same thing twice and push the text
+                  out of line with the heading above.
+                -->
+                <span class="what">{{ o.description }}</span>
+                <a [routerLink]="o.where">Open</a>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      <section class="card">
+        <h2>What happened today</h2>
+
+        @if (day.activity.length === 0) {
+          <p class="empty">Nothing was booked on this day.</p>
+        } @else {
+          <div class="scroll">
+            <table class="activity-table">
+              <thead>
+                <tr>
+                  <th>Activity</th>
+                  <th class="numeric">Count</th>
+                  <th class="numeric">Value</th>
+                  <th class="numeric">Charges</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (l of day.activity; track l.label) {
+                  <tr>
+                    <td>{{ l.label }}</td>
+                    <td class="numeric">{{ l.count }}</td>
+                    <td class="numeric">{{ l.total | number: '1.2-2' }}</td>
+                    <td class="numeric quiet">
+                      @if (l.fees) { {{ l.fees | number: '1.2-2' }} }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      @if (day.inFlight.length) {
+        <section class="card flight-card">
+          <div class="card-head">
+            <h2>Still in flight</h2>
+            <span class="flight-total">
+              {{ inFlightTotal() | number: '1.2-2' }} awaiting an answer
+            </span>
+          </div>
+          <p class="explain">
+            Debited and sent to the scheme, held in suspense until a status
+            report arrives. Not a break — this is the bank's open position —
+            but an old one usually means an answer that never came.
+          </p>
+
+          <ul class="flight">
+            @for (p of day.inFlight; track p.transactionReference) {
+              <li [class.stale]="isStale(p.ageInDays)">
+                <a class="mono" [routerLink]="['/payments', p.transactionReference]">
+                  {{ p.transactionReference }}
+                </a>
+                <span class="to">{{ p.beneficiary ?? 'unnamed beneficiary' }}</span>
+                <span class="amt">{{ p.amount | number: '1.2-2' }} {{ p.currency }}</span>
+                <span class="age" [class.old]="isStale(p.ageInDays)">
+                  @if (p.ageInDays === 0) { today }
+                  @else if (p.ageInDays === 1) { 1 day }
+                  @else { {{ p.ageInDays }} days }
+                </span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
 
     <div class="grid">
 
