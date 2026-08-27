@@ -78,7 +78,8 @@
           <option [ngValue]="null">Choose an account</option>
           @for (a of customerAccounts(); track a.id) {
             <option [ngValue]="a.id">
-              {{ a.iban }} — {{ a.currency }} ({{ a.balance | number: '1.2-2' }})
+              {{ a.clientName }} · {{ a.iban }} — {{ a.currency }}
+              ({{ a.balance | number: '1.2-2' }})
             </option>
           }
         </select>

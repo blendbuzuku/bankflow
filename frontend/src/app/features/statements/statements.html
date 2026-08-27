@@ -90,7 +90,7 @@
       </div>
 
       @if (showXml()) {
-        <pre class="xml">{{ xml() }}</pre>
+        <app-message-view [xml]="xml()" />
       }
 
       @if (isEmpty()) {
@@ -108,7 +108,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (e of s.entries; track e.entryReference) {
+              @for (e of visibleEntries(); track e.entryReference) {
                 <tr>
                   <td class="date">{{ e.bookingDate | date: 'dd MMM' }}</td>
                   <td class="detail">{{ e.description }}</td>
@@ -128,6 +128,16 @@
             </tbody>
           </table>
         </div>
+
+        @if (hiddenEntries() > 0) {
+          <button type="button" class="link show-more" (click)="toggleEntries()">
+            @if (showAllEntries()) {
+              Show the first {{ 12 }} only
+            } @else {
+              Show all {{ s.entries.length }} entries
+            }
+          </button>
+        }
       }
     </section>
   }

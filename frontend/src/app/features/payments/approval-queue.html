@@ -37,7 +37,15 @@
             <dl class="details">
               <div><dt>To</dt><dd>{{ beneficiary(t) }}</dd></div>
               @if (t.creditorIban) {
-                <div><dt>IBAN</dt><dd class="mono">{{ t.creditorIban }}</dd></div>
+                <div>
+                  <dt>Beneficiary</dt>
+                  <dd>
+                    @if (t.creditorName) {
+                      <span class="party">{{ t.creditorName }}</span>
+                    }
+                    <span class="mono">{{ t.creditorIban }}</span>
+                  </dd>
+                </div>
               }
               <div><dt>Raised by</dt><dd>{{ t.createdByUsername ?? 'unknown' }}</dd></div>
               <div><dt>At</dt><dd>{{ t.createdAt | date: 'dd MMM HH:mm' }}</dd></div>

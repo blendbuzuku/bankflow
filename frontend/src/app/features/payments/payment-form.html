@@ -56,7 +56,8 @@
               <option [ngValue]="null">Select an account</option>
               @for (a of selectableAccounts(); track a.id) {
                 <option [ngValue]="a.id">
-                  {{ a.iban }} — {{ a.accountType }} {{ a.currency }} ({{ a.balance | number: '1.2-2' }})
+                  {{ a.clientName }} · {{ a.iban }} — {{ a.accountType }}
+                  {{ a.currency }} ({{ a.balance | number: '1.2-2' }})
                 </option>
               }
             </select>
@@ -113,7 +114,7 @@
               <option [ngValue]="null">Select an account</option>
               @for (a of selectableAccounts(); track a.id) {
                 <option [ngValue]="a.id">
-                  {{ a.iban }} — {{ a.accountType }} {{ a.currency }}
+                  {{ a.clientName }} · {{ a.iban }} — {{ a.accountType }} {{ a.currency }}
                 </option>
               }
             </select>

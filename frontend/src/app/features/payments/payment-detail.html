@@ -43,9 +43,25 @@
         <h2>Parties</h2>
         <dl class="facts">
           <div class="wide"><dt>Debtor</dt><dd>{{ t.debtorName ?? '—' }}</dd></div>
-          @if (t.debtorIban) { <div class="wide"><dt>From</dt><dd class="mono">{{ t.debtorIban }}</dd></div> }
+          @if (t.debtorIban) {
+            <div class="wide">
+              <dt>From</dt>
+              <dd>
+                @if (t.debtorName) { <span class="party">{{ t.debtorName }}</span> }
+                <span class="mono">{{ t.debtorIban }}</span>
+              </dd>
+            </div>
+          }
           <div class="wide"><dt>Creditor</dt><dd>{{ t.creditorName ?? '—' }}</dd></div>
-          @if (t.creditorIban) { <div class="wide"><dt>To</dt><dd class="mono">{{ t.creditorIban }}</dd></div> }
+          @if (t.creditorIban) {
+            <div class="wide">
+              <dt>To</dt>
+              <dd>
+                @if (t.creditorName) { <span class="party">{{ t.creditorName }}</span> }
+                <span class="mono">{{ t.creditorIban }}</span>
+              </dd>
+            </div>
+          }
           @if (t.creditorAgentBic) { <div><dt>Their bank</dt><dd class="mono">{{ t.creditorAgentBic }}</dd></div> }
         </dl>
       </section>

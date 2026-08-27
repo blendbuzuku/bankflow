@@ -412,3 +412,15 @@
   border-color: #1565c0;
   box-shadow: 0 0 0 3px rgba(21, 101, 192, .12);
 }
+
+/*
+ * The name before the number. An IBAN identifies an account exactly and tells
+ * a person nothing.
+ */
+.party {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 1px;
+}

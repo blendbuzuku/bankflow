@@ -1,11 +1,14 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { switchMap } from 'rxjs/operators';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { AccountResponse, AccountService } from '../../core/services/account';
+import { MessageView } from '../../shared/message-view';
 import { AuthService } from '../../core/services/auth';
 import { Toasts } from '../../core/services/toasts';
 import {
+  StatementEntry,
   StatementResponse,
   TransactionService,
 } from '../../core/services/transaction';
@@ -19,7 +22,7 @@ import {
  */
 @Component({
   selector: 'app-statements',
-  imports: [DatePipe, DecimalPipe, FormsModule],
+  imports: [DatePipe, DecimalPipe, FormsModule, MessageView],
   templateUrl: './statements.html',
   styleUrl: './statements.css',
 })
@@ -54,11 +57,18 @@ export class Statements implements OnInit {
     this.to = this.asDate(today);
     this.from = this.asDate(monthAgo);
 
-    const source = this.authService.isStaff()
-      ? this.accountService.getAllAccounts()
-      : this.accountService.getMyAccounts();
-
-    source.subscribe({
+    /*
+     * Which accounts to offer depends on the role, and the role is not known
+     * until the profile is loaded. This route only checks that somebody is
+     * signed in, so on a direct navigation isStaff() is still false when this
+     * runs — and a teller would be asked for the accounts they personally
+     * hold, of which they have none.
+     */
+    this.authService.loadCurrentUser().pipe(
+      switchMap(() => this.authService.isStaff()
+        ? this.accountService.getAllAccounts()
+        : this.accountService.getMyAccounts()),
+    ).subscribe({
       next: accounts => {
         const usable = accounts.filter(
           a => (a.accountType === 'CURRENT' || a.accountType === 'SAVINGS')
@@ -101,6 +111,9 @@ export class Statements implements OnInit {
         next: statement => {
           this.statement.set(statement);
           this.loading.set(false);
+
+          // A new statement starts collapsed, whatever the last one was.
+          this.showAllEntries.set(false);
         },
         error: error => {
           this.loading.set(false);
@@ -142,15 +155,50 @@ export class Statements implements OnInit {
       });
   }
 
+  /**
+   * How an account reads in the picker.
+   *
+   * The holder comes first: an IBAN identifies an account exactly and tells a
+   * person nothing, so choosing between twenty of them by number alone is how
+   * a statement gets pulled for the wrong customer.
+   */
   label(account: AccountResponse): string {
 
     const purpose = account.purpose ? ` (${account.purpose})` : '';
+    const holder = account.clientName ? `${account.clientName} · ` : '';
 
-    return `${account.iban} — ${account.accountType}${purpose} ${account.currency}`;
+    return `${holder}${account.iban} — ${account.accountType}${purpose} `
+      + account.currency;
   }
 
   /** True when the period had no movement at all. */
   isEmpty(): boolean {
     return this.statement()?.entries.length === 0;
+  }
+
+  /**
+   * How many entries are on screen at once.
+   *
+   * A statement over a busy month runs to hundreds of lines, and dropping all
+   * of them on the page at once buries the balances at the top — which are
+   * what most people came for.
+   */
+  private static readonly PAGE = 12;
+
+  readonly showAllEntries = signal(false);
+
+  visibleEntries(): StatementEntry[] {
+
+    const entries = this.statement()?.entries ?? [];
+
+    return this.showAllEntries() ? entries : entries.slice(0, Statements.PAGE);
+  }
+
+  hiddenEntries(): number {
+    return Math.max(0, (this.statement()?.entries.length ?? 0) - Statements.PAGE);
+  }
+
+  toggleEntries(): void {
+    this.showAllEntries.set(!this.showAllEntries());
   }
 }

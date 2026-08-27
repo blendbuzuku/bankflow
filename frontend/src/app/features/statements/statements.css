@@ -268,3 +268,37 @@ td.detail { overflow-wrap: anywhere; }
 }
 
 .alert.error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+
+button.link.show-more {
+  display: block;
+  margin: 14px auto 0;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+button.link.show-more:hover { background: #eef2f8; }
+
+/*
+ * A table sits inside a card, so its first column should start where the
+ * card's heading starts. The cell padding that separates the columns must not
+ * also push the left edge in, or every row reads as indented under its title.
+ *
+ * Qualified by the table element so it outranks the class-scoped cell padding
+ * above; the bare element selector ties with it and loses on order.
+ */
+table th:first-child,
+table td:first-child { padding-left: 0; }
+
+table th:last-child,
+table td:last-child { padding-right: 0; }
+
+/*
+ * A right-aligned column needs its heading right-aligned too, or the figure
+ * sits nowhere near the name above it.
+ *
+ * Named on the heading explicitly because `thead th` outranks a bare class
+ * once Angular scopes both — two elements against one class — so `.numeric`
+ * alone silently loses on the header while winning on the cell.
+ */
+thead th.numeric,
+th.numeric { text-align: right; }

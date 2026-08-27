@@ -70,7 +70,12 @@
               <tbody>
                 @for (account of accounts(); track account.id) {
                   <tr>
-                    <td class="mono">{{ account.iban }}</td>
+                    <td>
+                      <span class="mono">{{ account.iban }}</span>
+                      @if (account.clientName) {
+                        <span class="holder">{{ account.clientName }}</span>
+                      }
+                    </td>
                     <td>
                       {{ account.accountType }}
                       @if (account.purpose) {
@@ -117,7 +122,8 @@
                   <option [ngValue]="null">Choose an account</option>
                   @for (a of accounts(); track a.id) {
                     <option [ngValue]="a.id">
-                      {{ a.iban }} — {{ a.currency }} ({{ a.balance | number: '1.2-2' }})
+                      {{ a.clientName }} · {{ a.iban }} — {{ a.currency }}
+                      ({{ a.balance | number: '1.2-2' }})
                     </option>
                   }
                 </select>
@@ -153,7 +159,9 @@
                 <select id="to" name="to" [(ngModel)]="destinationAccountId">
                   <option [ngValue]="null">Choose an account</option>
                   @for (a of accounts(); track a.id) {
-                    <option [ngValue]="a.id">{{ a.iban }} — {{ a.currency }}</option>
+                    <option [ngValue]="a.id">
+                      {{ a.clientName }} · {{ a.iban }} — {{ a.currency }}
+                    </option>
                   }
                 </select>
               </div>
@@ -189,13 +197,24 @@
       }
 
       <section class="card block">
-        <h2>Recent activity</h2>
+        <div class="block-head">
+          <h2>Recent activity</h2>
+          @if (hiddenCount() > 0) {
+            <button type="button" class="more" (click)="toggleHistory()">
+              @if (showAllHistory()) {
+                Show less
+              } @else {
+                Show all {{ history().length }}
+              }
+            </button>
+          }
+        </div>
 
         @if (history().length === 0) {
           <p class="empty">Nothing has moved through your accounts yet.</p>
         } @else {
           <ul class="activity">
-            @for (t of history(); track t.transactionReference) {
+            @for (t of visibleHistory(); track t.transactionReference) {
               <li>
                 <div class="direction" [class.out]="isOutgoing(t)">
                   @if (isOutgoing(t)) { &minus; } @else { + }
@@ -219,7 +238,37 @@
                 </div>
 
                 <span class="badge-status" [class]="statusTone(t.status)">{{ t.status }}</span>
+
+                <!--
+                  The column is always there so the rows stay aligned, even
+                  where an internal transfer has no message to show.
+                -->
+                @if (hasMessage(t)) {
+                  <button type="button" class="see-message"
+                          [class.open]="openMessageFor() === t.transactionReference"
+                          (click)="toggleMessage(t)"
+                          [attr.aria-expanded]="openMessageFor() === t.transactionReference"
+                          [attr.title]="openMessageFor() === t.transactionReference
+                            ? 'Hide the message'
+                            : 'See what was sent to the other bank'">
+                    <span class="chev" aria-hidden="true"></span>
+                  </button>
+                } @else {
+                  <span class="no-message"></span>
+                }
               </li>
+
+              @if (openMessageFor() === t.transactionReference) {
+                <li class="message-row">
+                  @if (messageError()) {
+                    <p class="msg-note">{{ messageError() }}</p>
+                  } @else if (messageXml()) {
+                    <app-message-view [xml]="messageXml()" />
+                  } @else {
+                    <p class="msg-note">Loading...</p>
+                  }
+                </li>
+              }
             }
           </ul>
         }
