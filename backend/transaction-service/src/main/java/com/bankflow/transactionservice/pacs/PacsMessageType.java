@@ -29,7 +29,15 @@ public enum PacsMessageType {
      */
     CAMT_056(
             "camt.056.001.08", null,
-            "FI to FI payment cancellation request");
+            "FI to FI payment cancellation request"),
+
+    /**
+     * Account statement. Published only in the RTGS set, but it describes an
+     * account rather than a rail, so it is used for every account we hold.
+     */
+    CAMT_053(
+            null, "camt.053.001.08",
+            "Bank to customer statement");
 
     private final String achIdentifier;
     private final String rtgsIdentifier;
