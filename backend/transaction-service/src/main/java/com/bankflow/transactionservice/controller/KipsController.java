@@ -2,6 +2,8 @@ package com.bankflow.transactionservice.controller;
 
 import com.bankflow.common.exception.BusinessException;
 import com.bankflow.transactionservice.entity.Transaction;
+import com.bankflow.transactionservice.kips.SchemeAction;
+import com.bankflow.transactionservice.kips.SchemeQueueService;
 import com.bankflow.transactionservice.pacs.*;
 import com.bankflow.transactionservice.repository.TransactionRepository;
 import com.bankflow.transactionservice.service.InboundMessageService;
@@ -11,6 +13,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 
 /**
  * The KIPS participant interface.
@@ -27,6 +31,7 @@ public class KipsController {
     private final Pacs002Builder pacs002Builder;
     private final Pacs004Builder pacs004Builder;
     private final MessageIdGenerator messageIdGenerator;
+    private final SchemeQueueService schemeQueue;
 
     public KipsController(
             InboundMessageService inboundMessageService,
@@ -34,7 +39,10 @@ public class KipsController {
             PacsMessageRepository messageRepository,
             Pacs002Builder pacs002Builder,
             Pacs004Builder pacs004Builder,
-            MessageIdGenerator messageIdGenerator) {
+            MessageIdGenerator messageIdGenerator,
+            SchemeQueueService schemeQueue) {
+
+        this.schemeQueue = schemeQueue;
 
         this.inboundMessageService = inboundMessageService;
         this.transactionRepository = transactionRepository;
@@ -42,6 +50,22 @@ public class KipsController {
         this.pacs002Builder = pacs002Builder;
         this.pacs004Builder = pacs004Builder;
         this.messageIdGenerator = messageIdGenerator;
+    }
+
+    /**
+     * What the scheme still has to answer.
+     *
+     * Read-only, and offered to anyone who may act on it, so the console can
+     * show the queue without also being the thing that changes it.
+     */
+    @PreAuthorize("hasAnyRole('OPERATIONS', 'BANK_ADMIN')")
+    @GetMapping("/queue")
+    public ResponseEntity<Map<String, List<SchemeAction>>> queue() {
+
+        return ResponseEntity.ok(Map.of(
+                "awaitingStatus", schemeQueue.awaitingStatus(),
+                "returnable", schemeQueue.returnable()
+        ));
     }
 
     /**
