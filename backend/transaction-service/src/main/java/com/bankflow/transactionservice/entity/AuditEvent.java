@@ -1,5 +1,6 @@
 package com.bankflow.transactionservice.entity;
 
+import com.bankflow.common.audit.AuditEventType;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -75,6 +76,16 @@ public class AuditEvent {
     @Column(name = "details", updatable = false, columnDefinition = "text")
     private String details;
 
+    /**
+     * Whether this event is money moving, rather than a decision about money.
+     *
+     * Stored rather than worked out at read time so the trail can be queried
+     * on it directly, and never set by a caller -- AuditService takes it from
+     * the event type, so a row cannot claim to be something its type is not.
+     */
+    @Column(name = "financial", nullable = false, updatable = false)
+    private boolean financial;
+
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private LocalDateTime occurredAt;
 
@@ -97,8 +108,20 @@ public class AuditEvent {
         return eventType;
     }
 
+    /**
+     * Setting the type sets what kind of event it is.
+     *
+     * There is deliberately no setter for the flag on its own. If callers
+     * could pass it, sooner or later one would pass the wrong one, and a row
+     * that says a settlement moved no money is worse than no row at all.
+     */
     public void setEventType(AuditEventType eventType) {
         this.eventType = eventType;
+        this.financial = eventType != null && eventType.isFinancial();
+    }
+
+    public boolean isFinancial() {
+        return financial;
     }
 
     public String getTransactionReference() {

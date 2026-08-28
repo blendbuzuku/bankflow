@@ -3,7 +3,7 @@ package com.bankflow.transactionservice.directory;
 import com.bankflow.common.exception.BusinessException;
 import com.bankflow.common.exception.DuplicateResourceException;
 import com.bankflow.common.exception.ResourceNotFoundException;
-import com.bankflow.transactionservice.entity.AuditEventType;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.security.AuthenticatedUser;
 import com.bankflow.transactionservice.security.SecurityUtils;
 import com.bankflow.transactionservice.service.AuditService;

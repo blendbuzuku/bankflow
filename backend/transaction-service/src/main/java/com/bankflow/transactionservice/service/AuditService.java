@@ -1,7 +1,7 @@
 package com.bankflow.transactionservice.service;
 
 import com.bankflow.transactionservice.entity.AuditEvent;
-import com.bankflow.transactionservice.entity.AuditEventType;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.repository.AuditEventRepository;
 import com.bankflow.transactionservice.security.AuthenticatedUser;
 import tools.jackson.databind.ObjectMapper;

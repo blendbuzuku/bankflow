@@ -1,7 +1,7 @@
 package com.bankflow.transactionservice.pacs;
 
 import com.bankflow.common.exception.BusinessException;
-import com.bankflow.transactionservice.entity.AuditEventType;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.entity.PaymentType;
 import com.bankflow.transactionservice.entity.Transaction;
 import com.bankflow.transactionservice.service.AuditService;

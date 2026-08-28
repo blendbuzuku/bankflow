@@ -2,7 +2,7 @@ package com.bankflow.transactionservice.eod;
 
 import com.bankflow.common.exception.BusinessException;
 import com.bankflow.transactionservice.calendar.BusinessCalendar;
-import com.bankflow.transactionservice.entity.AuditEventType;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.security.AuthenticatedUser;
 import com.bankflow.transactionservice.security.SecurityUtils;
 import com.bankflow.transactionservice.service.AuditService;

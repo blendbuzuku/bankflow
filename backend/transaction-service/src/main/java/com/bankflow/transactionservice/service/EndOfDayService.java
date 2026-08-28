@@ -1,6 +1,6 @@
 package com.bankflow.transactionservice.service;
 
-import com.bankflow.transactionservice.entity.AuditEventType;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.entity.Currency;
 import com.bankflow.transactionservice.entity.LedgerEntryType;
 import com.bankflow.transactionservice.repository.LedgerEntryRepository;

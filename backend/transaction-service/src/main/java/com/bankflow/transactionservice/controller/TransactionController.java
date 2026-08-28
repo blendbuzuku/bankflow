@@ -154,6 +154,23 @@ public class TransactionController {
         );
     }
 
+    /**
+     * Audit history for something that is not a payment.
+     *
+     * Staff only, and read-only: this is where "who approved this client"
+     * gets answered, and the answer is nobody's to edit.
+     */
+    @PreAuthorize("hasAnyRole('TELLER', 'OPERATIONS', 'BANK_ADMIN')")
+    @GetMapping("/audit/{entityType}/{entityId}")
+    public ResponseEntity<List<AuditEvent>> getEntityAuditTrail(
+            @PathVariable String entityType,
+            @PathVariable String entityId) {
+
+        return ResponseEntity.ok(
+                transactionService.getEntityAuditTrail(entityType, entityId)
+        );
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<TransactionResponse> getTransaction(
             @PathVariable Long id) {

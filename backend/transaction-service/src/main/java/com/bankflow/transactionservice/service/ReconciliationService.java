@@ -1,7 +1,7 @@
 package com.bankflow.transactionservice.service;
 
 import com.bankflow.transactionservice.client.AccountClient;
-import com.bankflow.transactionservice.entity.AuditEventType;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.entity.LedgerEntry;
 import com.bankflow.transactionservice.repository.LedgerEntryRepository;
 import org.slf4j.Logger;

@@ -5,7 +5,7 @@ import com.bankflow.transactionservice.client.AccountClient;
 import com.bankflow.transactionservice.eod.ClosedPeriodGuard;
 import com.bankflow.transactionservice.dto.AccountResponse;
 import com.bankflow.transactionservice.dto.BalanceOperationRequest;
-import com.bankflow.transactionservice.entity.AuditEventType;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.entity.LedgerEntry;
 import com.bankflow.transactionservice.entity.LedgerEntryType;
 import com.bankflow.transactionservice.entity.Transaction;

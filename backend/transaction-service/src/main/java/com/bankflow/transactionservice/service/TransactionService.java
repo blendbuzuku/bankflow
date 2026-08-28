@@ -6,7 +6,7 @@ import com.bankflow.transactionservice.client.AccountClient;
 import com.bankflow.transactionservice.dto.AccountResponse;
 import com.bankflow.transactionservice.dto.BalanceOperationRequest;
 import com.bankflow.transactionservice.dto.TransferRequest;
-import com.bankflow.transactionservice.entity.AuditEventType;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.entity.ChargeBearer;
 import com.bankflow.transactionservice.entity.Currency;
 import com.bankflow.transactionservice.entity.LedgerEntry;
@@ -56,6 +56,7 @@ public class TransactionService {
     private final ApprovalService approvalService;
     private final LedgerPoster ledgerPoster;
     private final FundsCheck fundsCheck;
+    private final PaymentFieldValidator fieldValidator;
 
     public TransactionService(
             TransactionRepository transactionRepository,
@@ -69,7 +70,11 @@ public class TransactionService {
             ApprovalService approvalService,
             LedgerPoster ledgerPoster,
             FundsCheck fundsCheck,
-            BusinessCalendar businessCalendar) {
+            BusinessCalendar businessCalendar,
+            PaymentFieldValidator fieldValidator
+) {
+
+        this.fieldValidator = fieldValidator;
 
         this.fundsCheck = fundsCheck;
         this.pacsMessageService = pacsMessageService;
@@ -153,14 +158,6 @@ public class TransactionService {
          * An external payment names its creditor by IBAN and agent, since we
          * hold no account for them. Both are mandatory in the message.
          */
-        if (request.getCreditorIban() == null
-                || request.getCreditorIban().isBlank()) {
-
-            throw new BusinessException(
-                    "Creditor IBAN is required for an outbound payment"
-            );
-        }
-
         if (request.getCreditorName() == null
                 || request.getCreditorName().isBlank()) {
 
@@ -168,6 +165,13 @@ public class TransactionService {
                     "Creditor name is required: the scheme mandates Cdtr/Nm"
             );
         }
+
+        /*
+         * Every field checked before a draft exists. A payment refused here
+         * has cost nothing; one refused by the scheme has already been booked
+         * and has to be unwound.
+         */
+        fieldValidator.validate(request, paymentType, true);
 
         Transaction draft = new Transaction();
 
@@ -192,6 +196,8 @@ public class TransactionService {
         draft.setCreditorName(request.getCreditorName());
         draft.setCreditorIban(request.getCreditorIban());
         draft.setCreditorAgentBic(request.getCreditorAgentBic());
+        draft.setCreditorCountry(
+                normaliseCountry(request.getCreditorCountry()));
 
         if (request.getSourceAccountId() != null) {
 
@@ -202,6 +208,13 @@ public class TransactionService {
             draft.setDebtorName(
                     firstNonBlank(request.getDebtorName(), source.clientName(), source.iban())
             );
+
+            // The payer's address travels with the payment. See PstlAdr.
+            draft.setDebtorAddressLine1(source.clientAddressLine1());
+            draft.setDebtorAddressLine2(source.clientAddressLine2());
+            draft.setDebtorCity(source.clientCity());
+            draft.setDebtorPostalCode(source.clientPostalCode());
+            draft.setDebtorCountry(source.clientCountry());
         }
 
         if (paymentType == PaymentType.KIPS_RTGS) {
@@ -912,6 +925,22 @@ public class TransactionService {
                 );
     }
 
+    /**
+     * Everything on the trail about one client or account.
+     *
+     * Answers the question a status column cannot: not what this client is,
+     * but who decided it and when.
+     */
+    @Transactional(readOnly = true)
+    public List<AuditEvent> getEntityAuditTrail(
+            String entityType, String entityId) {
+
+        return auditEventRepository
+                .findByEntityTypeAndEntityIdOrderByOccurredAtAsc(
+                        entityType, entityId
+                );
+    }
+
     @Transactional(readOnly = true)
     public Transaction getTransaction(Long id) {
 
@@ -1015,5 +1044,11 @@ public class TransactionService {
                 specification,
                 pageable
         );
+    }
+
+    /** Stored upper-case, because it is compared and written into the message. */
+    private String normaliseCountry(String country) {
+        return country == null || country.isBlank()
+                ? null : country.trim().toUpperCase();
     }
 }
