@@ -109,7 +109,8 @@
             <div class="row">
               <div class="field">
                 <label for="rail">Send by</label>
-                <select id="rail" name="rail" [(ngModel)]="paymentType">
+                <select id="rail" name="rail" [(ngModel)]="paymentType"
+                        (ngModelChange)="onRailChange()">
                   @for (r of availableRails(); track r.code) {
                     <option [value]="r.code">{{ r.label }}</option>
                   }
@@ -134,16 +135,57 @@
               <div class="field">
                 <label for="cname">Who are you paying?</label>
                 <input id="cname" name="cname" [(ngModel)]="creditorName" maxlength="70"
+                       [class.bad]="creditorNameError()"
                        placeholder="Their full name" />
+                @if (creditorNameError(); as problem) {
+                  <p class="field-error">{{ problem }}</p>
+                }
               </div>
 
               <div class="row">
+@if (foreignAllowed()) {
+                  <!--
+                    Only shown when the rail can actually reach another country. On
+                    either KIPS rail the answer is Kosovo and nothing else, so a list
+                    of two hundred is a list of a hundred and ninety-nine mistakes.
+                  -->
+                  <div class="field iban-country">
+                    <label for="cibanCountry">Country <span class="req" aria-hidden="true">*</span></label>
+                    <select id="cibanCountry" name="cibanCountry" [(ngModel)]="ibanCountry">
+                      <optgroup label="Commonly chosen">
+                        @for (c of commonCountries; track c.code) {
+                          <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+                        }
+                      </optgroup>
+                      <optgroup label="All countries">
+                        @for (c of otherCountries; track c.code) {
+                          <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+                        }
+                      </optgroup>
+                    </select>
+                  </div>
+                }
+
                 <div class="field grow">
                   <label for="ciban">Their IBAN</label>
-                  <input id="ciban" name="ciban" [(ngModel)]="creditorIban" maxlength="34"
-                         placeholder="XK051501006000012345" />
+                  <div class="iban-box" [class.bad]="ibanError()">
+                    <span class="iban-prefix">{{ ibanCountry }}</span>
+                    <input id="ciban" name="ciban" [(ngModel)]="ibanRest"
+                           maxlength="32" placeholder="101501006000012345" />
+                  </div>
+                  <!--
+                    An IBAN carries its own checksum, so a wrong digit is
+                    catchable while the customer is still looking at it --
+                    rather than days later, as a rejection they have to
+                    telephone about.
+                  -->
+                  @if (ibanError(); as problem) {
+                    <p class="field-error">{{ problem }}</p>
+                  } @else if (ibanRemaining() > 0) {
+                    <p class="hint">{{ ibanRemaining() }} more to type.</p>
+                  }
                 </div>
-                <div class="field">
+                                <div class="field">
                   <label for="cbic">Their bank</label>
                   <select id="cbic" name="cbic" [(ngModel)]="creditorAgentBic">
                     <option value="">Choose a bank</option>
@@ -171,7 +213,11 @@
               <div class="field">
                 <label for="amt">Amount</label>
                 <input id="amt" name="amt" type="number" step="0.01" min="0.01"
+                       [class.bad]="amountError()"
                        [(ngModel)]="amount" placeholder="0.00" />
+                @if (amountError(); as problem) {
+                  <p class="field-error">{{ problem }}</p>
+                }
                 @if (limitFor(selectedCurrency()); as cap) {
                   <p class="hint">
                     Up to {{ cap | number: '1.2-2' }} {{ selectedCurrency() }} online.
@@ -183,7 +229,11 @@
               <div class="field grow">
                 <label for="ref">Reference</label>
                 <input id="ref" name="ref" [(ngModel)]="remittanceInformation" maxlength="140"
+                       [class.bad]="remittanceError()"
                        placeholder="What is this for?" />
+                @if (remittanceError(); as problem) {
+                  <p class="field-error">{{ problem }}</p>
+                }
               </div>
             </div>
 

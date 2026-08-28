@@ -16,6 +16,19 @@ import { MessageView } from '../../shared/message-view';
 import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 import { Toasts } from '../../core/services/toasts';
 import {
+  COUNTRIES_COMMON,
+  COUNTRIES_REST,
+} from '../../core/validation/countries';
+import { IBAN_LENGTHS } from '../../core/validation/iban';
+
+import {
+  amountProblem,
+  bicProblem,
+  ibanProblem,
+  schemeTextProblem,
+  wrongCountryForRail,
+} from '../../core/validation/iban';
+import {
   BankDirectoryService,
   CorrespondentBank,
 } from '../../core/services/bank-directory';
@@ -59,7 +72,7 @@ export class Dashboard implements OnInit, HasUnsavedChanges {
 
     return !!(this.amount
       || this.creditorName.trim()
-      || this.creditorIban.trim()
+      || this.ibanRest.trim()
       || this.remittanceInformation.trim()
       || this.destinationAccountId);
   }
@@ -94,8 +107,94 @@ export class Dashboard implements OnInit, HasUnsavedChanges {
   destinationAccountId: number | null = null;
   amount: number | null = null;
   creditorName = '';
-  creditorIban = '';
+  creditorIban = 'XK';
   creditorAgentBic = '';
+
+  /*
+   * Where the money is going, picked rather than typed.
+   *
+   * Unlike an IBAN a country code carries no checksum, so a wrong-but-real
+   * code is indistinguishable from a right one and nothing downstream can
+   * catch it. It goes into the beneficiary's PstlAdr and is what screening a
+   * destination country has to run on.
+   */
+
+  /*
+   * The IBAN's country is chosen from the list; the rest is typed.
+   *
+   * Those two characters are the one part of an IBAN nothing protects. A wrong
+   * digit anywhere else fails the mod-97 check, but type DE where you meant DK
+   * and both are real countries -- the checksum is satisfied and the payment
+   * is simply addressed to the wrong place. So they are set by the dropdown
+   * and shown fixed on the field, where they cannot be typed over.
+   *
+   * Accessors over the one creditorIban value rather than two more pieces of
+   * state, so validation, reset and the request body all keep working from a
+   * single source and cannot drift from what is on screen.
+   */
+  get ibanCountry(): string {
+    return this.creditorIban.slice(0, 2).toUpperCase();
+  }
+
+  set ibanCountry(code: string) {
+    this.creditorIban = (code ?? '').toUpperCase() + this.creditorIban.slice(2);
+  }
+
+  get ibanRest(): string {
+    return this.creditorIban.slice(2);
+  }
+
+  set ibanRest(rest: string) {
+    this.creditorIban =
+      this.ibanCountry + (rest ?? '').toUpperCase().replace(/\s/g, '');
+  }
+
+  /** How much of an IBAN of the chosen country is still missing. */
+  ibanRemaining(): number {
+
+    const expected = IBAN_LENGTHS[this.ibanCountry];
+
+    return expected ? expected - this.creditorIban.length : 0;
+  }
+
+
+  /**
+   * Whether this rail can reach another country at all.
+   *
+   * KIPS clears Kosovo, so on either KIPS rail the beneficiary country is not
+   * a question with more than one answer -- offering two hundred of them is
+   * offering a hundred and ninety-nine ways to be wrong about something the
+   * rail already decided.
+   */
+  /** The rail decides where the money may go, so the country follows it. */
+  onRailChange(): void {
+    this.snapCountryToRail();
+  }
+
+  foreignAllowed(): boolean {
+    return this.paymentType === 'INTERNATIONAL';
+  }
+
+
+  /**
+   * Keeps the IBAN's country honest when the rail changes.
+   *
+   * Picking Germany for an international payment and then switching to KIPS
+   * would otherwise leave DE sitting at the head of the IBAN on a rail that
+   * cannot carry it.
+   */
+  private snapCountryToRail(): void {
+
+    if (!this.foreignAllowed() && this.ibanCountry !== 'XK') {
+      this.ibanCountry = 'XK';
+    }
+  }
+
+  readonly commonCountries = COUNTRIES_COMMON;
+  readonly otherCountries = COUNTRIES_REST;
+
+
+
   remittanceInformation = '';
 
   ngOnInit(): void {
@@ -296,14 +395,64 @@ export class Dashboard implements OnInit, HasUnsavedChanges {
     this.sendSuccess.set('');
   }
 
+  /*
+   * The same rules the server applies. A customer paying their own bills has
+   * nobody at a counter to catch a mistyped IBAN for them, so this screen
+   * needs the check more than the teller's does, not less.
+   */
+
+  ibanError(): string | null {
+
+    /*
+     * A country with nothing after it is an untouched field, not a bad IBAN.
+     * The country is preset, so without this the form opens already
+     * complaining about a number nobody has started typing.
+     */
+    if (!this.ibanRest.trim()) {
+      return null;
+    }
+
+    return ibanProblem(this.creditorIban)
+      ?? wrongCountryForRail(this.creditorIban, this.paymentType);
+  }
+
+  bicError(): string | null {
+    return bicProblem(this.creditorAgentBic);
+  }
+
+  creditorNameError(): string | null {
+    return schemeTextProblem(this.creditorName, 'The beneficiary name', 70);
+  }
+
+  remittanceError(): string | null {
+    return schemeTextProblem(
+      this.remittanceInformation, 'The payment reference', 140,
+    );
+  }
+
+  amountError(): string | null {
+    return amountProblem(this.amount);
+  }
+
   canSend(): boolean {
 
     if (!this.sourceAccountId || !this.amount || this.amount <= 0) {
       return false;
     }
 
+    if (this.amountError()
+      || this.creditorNameError()
+      || this.remittanceError()
+      || (this.isExternal()
+        && (this.ibanError() || this.bicError()
+          ))) {
+
+      return false;
+    }
+
     return this.isExternal()
-      ? !!(this.creditorIban && this.creditorName && this.creditorAgentBic)
+      ? !!(this.creditorIban && this.creditorName && this.creditorAgentBic
+        )
       : !!this.destinationAccountId;
   }
 
@@ -327,6 +476,7 @@ export class Dashboard implements OnInit, HasUnsavedChanges {
       creditorName: this.creditorName || null,
       creditorIban: this.creditorIban || null,
       creditorAgentBic: this.creditorAgentBic || null,
+      creditorCountry: this.isExternal() ? this.ibanCountry : null,
       remittanceInformation: this.remittanceInformation || null,
     }).subscribe({
       next: transaction => {
@@ -359,13 +509,22 @@ export class Dashboard implements OnInit, HasUnsavedChanges {
     });
   }
 
+  /**
+   * Back to how the form loads, every field.
+   *
+   * Called only on a payment that went through. One that failed keeps
+   * everything, because those fields are what needs correcting.
+   */
   private resetForm(): void {
-    this.amount = null;
+    this.paymentType = 'INTERNAL';
+    this.sourceAccountId = null;
     this.destinationAccountId = null;
+    this.amount = null;
     this.creditorName = '';
-    this.creditorIban = '';
+    this.creditorIban = 'XK';
     this.creditorAgentBic = '';
     this.remittanceInformation = '';
+    this.sendError.set('');
   }
 
   private reload(): void {

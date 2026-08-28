@@ -3,6 +3,20 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Toasts } from '../../core/services/toasts';
+import { WorkQueues } from '../../core/services/work-queues';
+import {
+  COUNTRIES_COMMON,
+  COUNTRIES_REST,
+} from '../../core/validation/countries';
+import { IBAN_LENGTHS } from '../../core/validation/iban';
+
+import {
+  amountProblem,
+  bicProblem,
+  ibanProblem,
+  schemeTextProblem,
+  wrongCountryForRail,
+} from '../../core/validation/iban';
 import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 import {
   BankDirectoryService,
@@ -57,18 +71,58 @@ export class PaymentForm implements OnInit, HasUnsavedChanges {
 
     return !!(this.amount
       || this.creditorName.trim()
-      || this.creditorIban.trim()
+      || this.ibanRest.trim()
       || this.debtorName.trim()
       || this.remittanceInformation.trim()
       || this.sourceAccountId
       || this.destinationAccountId);
   }
 
+  /**
+   * Puts the form back exactly as it loads.
+   *
+   * Every field, not a chosen subset: after a payment has gone, what is left
+   * on screen belongs to a payment that no longer needs typing. Leaving some
+   * of it -- the rail, the currency -- would mean the next payment starts
+   * half-filled with the last one's answers, which is how somebody sends
+   * RTGS when they meant ACH.
+   *
+   * Kept beside the check above because the two are one decision about what
+   * counts as work in progress. When they were apart they drifted, and a
+   * payment that had just been sent successfully was announced as unsaved
+   * work about to be lost.
+   *
+   * Only ever called after a success. A failed payment leaves everything
+   * untouched, because the fields are what the person needs to correct.
+   */
+  private resetForm(): void {
+
+    this.paymentType = 'KIPS_ACH';
+    this.sourceAccountId = null;
+    this.destinationAccountId = null;
+    this.amount = null;
+    this.currency = 'EUR';
+    this.chargeBearer = 'SLEV';
+    this.purposeCode = '';
+    this.remittanceInformation = '';
+    this.debtorName = '';
+    this.creditorName = '';
+    this.creditorIban = 'XK';
+    this.creditorAgentBic = '';
+
+    // The price and the message belonged to the payment that has now gone.
+    this.quote.set(null);
+    this.quoteError.set('');
+    this.previewXml.set('');
+    this.previewError.set('');
+    this.submitError.set('');
+  }
 
   private readonly accountService = inject(AccountService);
   private readonly transactionService = inject(TransactionService);
   private readonly router = inject(Router);
   private readonly toasts = inject(Toasts);
+  private readonly queues = inject(WorkQueues);
   private readonly bankDirectory = inject(BankDirectoryService);
 
   readonly banks = signal<CorrespondentBank[]>([]);
@@ -93,8 +147,89 @@ export class PaymentForm implements OnInit, HasUnsavedChanges {
 
   debtorName = '';
   creditorName = '';
-  creditorIban = '';
+  creditorIban = 'XK';
   creditorAgentBic = '';
+
+  /*
+   * Where the money is going, picked rather than typed.
+   *
+   * Unlike an IBAN a country code carries no checksum, so a wrong-but-real
+   * code is indistinguishable from a right one and nothing downstream can
+   * catch it. It goes into the beneficiary's PstlAdr and is what screening a
+   * destination country has to run on.
+   */
+
+  /*
+   * The IBAN's country is chosen from the list; the rest is typed.
+   *
+   * Those two characters are the one part of an IBAN nothing protects. A wrong
+   * digit anywhere else fails the mod-97 check, but type DE where you meant DK
+   * and both are real countries -- the checksum is satisfied and the payment
+   * is simply addressed to the wrong place. So they are set by the dropdown
+   * and shown fixed on the field, where they cannot be typed over.
+   *
+   * Accessors over the one creditorIban value rather than two more pieces of
+   * state, so validation, reset and the request body all keep working from a
+   * single source and cannot drift from what is on screen.
+   */
+  get ibanCountry(): string {
+    return this.creditorIban.slice(0, 2).toUpperCase();
+  }
+
+  set ibanCountry(code: string) {
+    this.creditorIban = (code ?? '').toUpperCase() + this.creditorIban.slice(2);
+  }
+
+  get ibanRest(): string {
+    return this.creditorIban.slice(2);
+  }
+
+  set ibanRest(rest: string) {
+    this.creditorIban =
+      this.ibanCountry + (rest ?? '').toUpperCase().replace(/\s/g, '');
+  }
+
+  /** How much of an IBAN of the chosen country is still missing. */
+  ibanRemaining(): number {
+
+    const expected = IBAN_LENGTHS[this.ibanCountry];
+
+    return expected ? expected - this.creditorIban.length : 0;
+  }
+
+
+  /**
+   * Whether this rail can reach another country at all.
+   *
+   * KIPS clears Kosovo, so on either KIPS rail the beneficiary country is not
+   * a question with more than one answer -- offering two hundred of them is
+   * offering a hundred and ninety-nine ways to be wrong about something the
+   * rail already decided.
+   */
+  foreignAllowed(): boolean {
+    return this.paymentType === 'INTERNATIONAL';
+  }
+
+
+  /**
+   * Keeps the IBAN's country honest when the rail changes.
+   *
+   * Picking Germany for an international payment and then switching to KIPS
+   * would otherwise leave DE sitting at the head of the IBAN on a rail that
+   * cannot carry it.
+   */
+  private snapCountryToRail(): void {
+
+    if (!this.foreignAllowed() && this.ibanCountry !== 'XK') {
+      this.ibanCountry = 'XK';
+    }
+  }
+
+  readonly commonCountries = COUNTRIES_COMMON;
+  readonly otherCountries = COUNTRIES_REST;
+
+
+
 
   // --- what the server says about it ---
 
@@ -151,6 +286,7 @@ export class PaymentForm implements OnInit, HasUnsavedChanges {
       this.chargeBearer = permitted[0];
     }
 
+    this.snapCountryToRail();
     this.clearDerived();
   }
 
@@ -234,6 +370,16 @@ export class PaymentForm implements OnInit, HasUnsavedChanges {
           );
         }
 
+        /*
+         * Cleared before navigating, not after: the guard runs during the
+         * navigation, and a form still full of a payment that has already
+         * gone would stop the very screen showing it was sent.
+         */
+        this.resetForm();
+
+        // A sent payment joins the queue the scheme has to answer.
+        this.queues.refresh();
+
         this.router.navigate(['/payments', transaction.transactionReference]);
       },
       error: error => {
@@ -269,7 +415,66 @@ export class PaymentForm implements OnInit, HasUnsavedChanges {
       creditorName: this.creditorName || null,
       creditorIban: this.creditorIban || null,
       creditorAgentBic: this.creditorAgentBic || null,
+      creditorCountry: this.isExternal() ? this.ibanCountry : null,
     };
+  }
+
+  /*
+   * The same rules the server applies, checked while the field still has the
+   * cursor in it. The server stays the authority and repeats every one of
+   * them -- an IBAN that only the browser checked is an IBAN nobody checked.
+   *
+   * Each returns null when there is nothing wrong, so the template can show
+   * the reason directly rather than mapping a boolean back to an explanation.
+   */
+
+  ibanError(): string | null {
+
+    /*
+     * A country with nothing after it is an untouched field, not a bad IBAN.
+     * The country is preset, so without this the form opens already
+     * complaining about a number nobody has started typing.
+     */
+    if (!this.ibanRest.trim()) {
+      return null;
+    }
+
+    return ibanProblem(this.creditorIban)
+      ?? wrongCountryForRail(this.creditorIban, this.paymentType);
+  }
+
+  bicError(): string | null {
+    return bicProblem(this.creditorAgentBic);
+  }
+
+  creditorNameError(): string | null {
+    return schemeTextProblem(this.creditorName, 'The beneficiary name', 70);
+  }
+
+  debtorNameError(): string | null {
+    return schemeTextProblem(this.debtorName, 'The payer name', 70);
+  }
+
+  remittanceError(): string | null {
+    return schemeTextProblem(
+      this.remittanceInformation, 'The payment reference', 140,
+    );
+  }
+
+  amountError(): string | null {
+    return amountProblem(this.amount);
+  }
+
+  /** Anything that would be refused, so submit can be held back. */
+  private anyFieldError(): boolean {
+
+    return !!(this.amountError()
+      || this.creditorNameError()
+      || this.debtorNameError()
+      || this.remittanceError()
+      || (this.isExternal()
+        && (this.ibanError() || this.bicError()
+          )));
   }
 
   canSubmit(): boolean {
@@ -278,8 +483,13 @@ export class PaymentForm implements OnInit, HasUnsavedChanges {
       return false;
     }
 
+    if (this.anyFieldError()) {
+      return false;
+    }
+
     return this.isExternal()
-      ? !!(this.creditorIban && this.creditorName && this.creditorAgentBic)
+      ? !!(this.creditorIban && this.creditorName && this.creditorAgentBic
+        )
       : !!this.destinationAccountId;
   }
 

@@ -495,3 +495,101 @@ table td:last-child { padding-right: 0; }
  */
 thead th.numeric,
 th.numeric { text-align: right; }
+
+/* A field the scheme would refuse, named where the mistake is. */
+.field-error {
+  margin: 5px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #b91c1c;
+}
+
+.field input.bad,
+.field select.bad {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+/*
+ * An IBAN with its country fixed at the head.
+ *
+ * The prefix is text, not a disabled input: there is nothing to focus, nothing
+ * to tab into, and nothing to type over. It reads as one field because it is
+ * one value -- the dropdown above sets those two characters.
+ */
+.iban-box {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.iban-box:focus-within {
+  border-color: #1565c0;
+  box-shadow: 0 0 0 3px rgba(21, 101, 192, .12);
+}
+
+.iban-box.bad {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.iban-prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: #f1f5f9;
+  border-right: 1px solid #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: #475569;
+  user-select: none;
+}
+
+.iban-box input {
+  flex: 1;
+  min-width: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .04em;
+}
+
+.field.iban-country { flex: 0 1 240px; }
+
+/*
+ * Every label is one line of the same height, so every input in a row starts
+ * at the same y whatever its label says.
+ *
+ * The word "required" does not fit a narrow label -- the country field is the
+ * one that showed it. The label wrapped to two lines and dropped that field's
+ * input below its neighbours, which is why the row looked out of true only
+ * once the country box appeared.
+ */
+.field label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+}
+
+/* Carries "required" in no width, which a narrow field has none of. */
+.req {
+  color: #b91c1c;
+  font-weight: 700;
+  font-size: inherit;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: 0;
+}

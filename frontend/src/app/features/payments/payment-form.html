@@ -2,7 +2,11 @@
 
   <header class="page-head">
     <h1>New payment</h1>
-    <p>Enter the instruction, check the charge, and review the scheme message before it is sent.</p>
+    <p>
+      Enter the instruction, check the charge, and review the scheme message
+      before it is sent.
+      <span class="legend">Fields marked <span class="req">*</span> are required.</span>
+    </p>
   </header>
 
   <div class="layout">
@@ -76,21 +80,66 @@
 
         @if (isExternal()) {
           <div class="field">
-            <label for="creditorName">Beneficiary name <span class="req">required</span></label>
+            <label for="creditorName">Beneficiary name <span class="req" aria-hidden="true">*</span></label>
             <input id="creditorName" name="creditorName" [(ngModel)]="creditorName" maxlength="70"
+                   [class.bad]="creditorNameError()"
                    placeholder="Who is being paid" />
+            @if (creditorNameError(); as problem) {
+              <p class="field-error">{{ problem }}</p>
+            }
           </div>
 
           <div class="row">
+@if (foreignAllowed()) {
+              <!--
+                Only shown when the rail can actually reach another country. On
+                either KIPS rail the answer is Kosovo and nothing else, so a list
+                of two hundred is a list of a hundred and ninety-nine mistakes.
+              -->
+              <div class="field iban-country">
+                <label for="ibanCountry">Country <span class="req" aria-hidden="true">*</span></label>
+                <select id="ibanCountry" name="ibanCountry" [(ngModel)]="ibanCountry">
+                  <optgroup label="Commonly chosen">
+                    @for (c of commonCountries; track c.code) {
+                      <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+                    }
+                  </optgroup>
+                  <optgroup label="All countries">
+                    @for (c of otherCountries; track c.code) {
+                      <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+                    }
+                  </optgroup>
+                </select>
+              </div>
+            }
+
             <div class="field grow">
-              <label for="creditorIban">Beneficiary IBAN <span class="req">required</span></label>
-              <input id="creditorIban" name="creditorIban" [(ngModel)]="creditorIban" maxlength="34"
-                     placeholder="XK051501006000012345" />
+              <label for="creditorIban">Beneficiary IBAN <span class="req" aria-hidden="true">*</span></label>
+              <!--
+                The country sits fixed at the head of the field, set by the
+                list above. It reads as one IBAN and cannot be typed over.
+              -->
+              <div class="iban-box" [class.bad]="ibanError()">
+                <span class="iban-prefix">{{ ibanCountry }}</span>
+                <input id="creditorIban" name="creditorIban" [(ngModel)]="ibanRest"
+                       maxlength="32" placeholder="101501006000012345" />
+              </div>
+              <!--
+                Said as soon as it is wrong, not after a round trip. An IBAN
+                carries its own checksum, so a mistyped digit is detectable
+                here rather than days later as a scheme rejection.
+              -->
+              @if (ibanError(); as problem) {
+                <p class="field-error">{{ problem }}</p>
+              } @else if (ibanRemaining() > 0) {
+                <p class="hint">{{ ibanRemaining() }} more to type.</p>
+              }
             </div>
+
 
             <div class="field">
               <label for="creditorAgentBic">
-                Beneficiary's bank <span class="req">required</span>
+                Beneficiary's bank <span class="req" aria-hidden="true">*</span>
               </label>
               <select id="creditorAgentBic" name="creditorAgentBic"
                       [(ngModel)]="creditorAgentBic">
@@ -122,7 +171,11 @@
 
           <div class="field">
             <label for="creditorNameInt">Beneficiary name</label>
-            <input id="creditorNameInt" name="creditorNameInt" [(ngModel)]="creditorName" maxlength="70" />
+            <input id="creditorNameInt" name="creditorNameInt" [(ngModel)]="creditorName" maxlength="70"
+                   [class.bad]="creditorNameError()" />
+            @if (creditorNameError(); as problem) {
+              <p class="field-error">{{ problem }}</p>
+            }
           </div>
         }
       </section>
@@ -134,7 +187,11 @@
           <div class="field">
             <label for="amount">Amount</label>
             <input id="amount" name="amount" type="number" step="0.01" min="0.01"
+                   [class.bad]="amountError()"
                    [(ngModel)]="amount" (ngModelChange)="onAmountChange()" placeholder="0.00" />
+            @if (amountError(); as problem) {
+              <p class="field-error">{{ problem }}</p>
+            }
           </div>
 
           <div class="field">
@@ -152,7 +209,11 @@
           <label for="remittance">Remittance information</label>
           <input id="remittance" name="remittance" [(ngModel)]="remittanceInformation" maxlength="140"
                  placeholder="Reference the beneficiary will see" />
-          <p class="hint">{{ remittanceInformation.length }} / 140</p>
+          @if (remittanceError(); as problem) {
+            <p class="field-error">{{ problem }}</p>
+          } @else {
+            <p class="hint">{{ remittanceInformation.length }} / 140</p>
+          }
         </div>
       </section>
 
