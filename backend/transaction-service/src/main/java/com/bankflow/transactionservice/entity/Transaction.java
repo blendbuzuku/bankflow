@@ -169,6 +169,29 @@ public class Transaction {
     @Column(name = "debtor_agent_bic", length = 11)
     private String debtorAgentBic;
 
+    /*
+     * The debtor's address as it stood when the payment was made.
+     *
+     * Copied onto the transaction rather than looked up from the client each
+     * time, because a message has to stay reproducible: regenerating the
+     * pacs.008 for a payment sent last year must produce what was actually
+     * sent, and the customer may have moved since.
+     */
+    @Column(name = "debtor_address_line1", length = 70)
+    private String debtorAddressLine1;
+
+    @Column(name = "debtor_address_line2", length = 70)
+    private String debtorAddressLine2;
+
+    @Column(name = "debtor_city", length = 35)
+    private String debtorCity;
+
+    @Column(name = "debtor_postal_code", length = 16)
+    private String debtorPostalCode;
+
+    @Column(name = "debtor_country", length = 2)
+    private String debtorCountry;
+
     @Column(name = "creditor_name", length = 140)
     private String creditorName;
 
@@ -177,6 +200,16 @@ public class Transaction {
 
     @Column(name = "creditor_agent_bic", length = 11)
     private String creditorAgentBic;
+
+    /**
+     * Where the money is going, as an ISO country code.
+     *
+     * Written into the creditor's PstlAdr. A domestic payment can infer it
+     * from the rail, but an international one cannot, and it is what screening
+     * against a destination country needs in order to have anything to run on.
+     */
+    @Column(name = "creditor_country", length = 2)
+    private String creditorCountry;
 
     /**
      * Unstructured remittance information. ISO caps this at 140 characters.
@@ -457,6 +490,46 @@ public class Transaction {
         this.debtorAgentBic = debtorAgentBic;
     }
 
+    public String getDebtorAddressLine1() {
+        return debtorAddressLine1;
+    }
+
+    public void setDebtorAddressLine1(String debtorAddressLine1) {
+        this.debtorAddressLine1 = debtorAddressLine1;
+    }
+
+    public String getDebtorAddressLine2() {
+        return debtorAddressLine2;
+    }
+
+    public void setDebtorAddressLine2(String debtorAddressLine2) {
+        this.debtorAddressLine2 = debtorAddressLine2;
+    }
+
+    public String getDebtorCity() {
+        return debtorCity;
+    }
+
+    public void setDebtorCity(String debtorCity) {
+        this.debtorCity = debtorCity;
+    }
+
+    public String getDebtorPostalCode() {
+        return debtorPostalCode;
+    }
+
+    public void setDebtorPostalCode(String debtorPostalCode) {
+        this.debtorPostalCode = debtorPostalCode;
+    }
+
+    public String getDebtorCountry() {
+        return debtorCountry;
+    }
+
+    public void setDebtorCountry(String debtorCountry) {
+        this.debtorCountry = debtorCountry;
+    }
+
     public String getCreditorName() {
         return creditorName;
     }
@@ -479,6 +552,14 @@ public class Transaction {
 
     public void setCreditorAgentBic(String creditorAgentBic) {
         this.creditorAgentBic = creditorAgentBic;
+    }
+
+    public String getCreditorCountry() {
+        return creditorCountry;
+    }
+
+    public void setCreditorCountry(String creditorCountry) {
+        this.creditorCountry = creditorCountry;
     }
 
     public String getRemittanceInformation() {

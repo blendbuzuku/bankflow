@@ -125,13 +125,13 @@ public class Pacs008Builder {
 
         xml.text(tx, "ChrgBr", transaction.getChargeBearer().getCode());
 
-        party(xml, tx, "Dbtr", transaction.getDebtorName());
+        debtor(xml, tx, transaction);
         account(xml, tx, "DbtrAcct", transaction.getDebtorIban());
 
         agent(xml, tx, "DbtrAgt", agentOrOwn(transaction.getDebtorAgentBic()));
         agent(xml, tx, "CdtrAgt", agentOrOwn(transaction.getCreditorAgentBic()));
 
-        party(xml, tx, "Cdtr", transaction.getCreditorName());
+        creditor(xml, tx, transaction);
         account(xml, tx, "CdtrAcct", transaction.getCreditorIban());
 
         purpose(xml, tx, transaction);
@@ -229,13 +229,13 @@ public class Pacs008Builder {
                 agentOrOwn(transaction.getCreditorAgentBic())
         );
 
-        party(xml, tx, "Dbtr", transaction.getDebtorName());
+        debtor(xml, tx, transaction);
         account(xml, tx, "DbtrAcct", transaction.getDebtorIban());
 
         agent(xml, tx, "DbtrAgt", agentOrOwn(transaction.getDebtorAgentBic()));
         agent(xml, tx, "CdtrAgt", agentOrOwn(transaction.getCreditorAgentBic()));
 
-        party(xml, tx, "Cdtr", transaction.getCreditorName());
+        creditor(xml, tx, transaction);
         account(xml, tx, "CdtrAcct", transaction.getCreditorIban());
 
         remittance(xml, tx, transaction);
@@ -262,6 +262,73 @@ public class Pacs008Builder {
          * worth surfacing rather than papering over.
          */
         xml.text(party, "Nm", requireName(partyName, name));
+    }
+
+    /**
+     * The debtor, with the address that identifies them.
+     *
+     * A name alone tells the receiving bank almost nothing -- there are a lot
+     * of people called Arben Krasniqi. The funds transfer rules expect an
+     * address, a national identifier, or date and place of birth to travel
+     * with the payment, and PstlAdr is where the first of those goes.
+     *
+     * Written only when there is an address to write. Every child of
+     * PostalAddress24 is optional, but an empty PstlAdr element is worse than
+     * none: it asserts that the address is known and empty.
+     */
+    private void debtor(XmlBuilder xml, Element parent, Transaction transaction) {
+
+        Element party = xml.child(parent, "Dbtr");
+
+        xml.text(party, "Nm", requireName(transaction.getDebtorName(), "Dbtr"));
+
+        boolean hasAddress = notBlank(transaction.getDebtorAddressLine1())
+                || notBlank(transaction.getDebtorCity())
+                || notBlank(transaction.getDebtorCountry());
+
+        if (!hasAddress) {
+            return;
+        }
+
+        Element address = xml.child(party, "PstlAdr");
+
+        /*
+         * Element order is the schema's, not ours: PostalAddress24 is a
+         * sequence, so StrtNm before PstCd before TwnNm before Ctry. Out of
+         * order it fails validation with a message about the wrong element.
+         */
+        xml.optional(address, "StrtNm", transaction.getDebtorAddressLine1());
+        xml.optional(address, "PstCd", transaction.getDebtorPostalCode());
+        xml.optional(address, "TwnNm", transaction.getDebtorCity());
+        xml.optional(address, "Ctry", transaction.getDebtorCountry());
+    }
+
+    /**
+     * The beneficiary, with the country the money is going to.
+     *
+     * Only the country, not a full address: the two sides are not symmetric.
+     * The payer's details are what has to accompany a transfer under the funds
+     * transfer rules; the payee is identified by their account. Country is the
+     * part that carries weight on its own, because it is what screening a
+     * destination runs against.
+     */
+    private void creditor(XmlBuilder xml, Element parent, Transaction transaction) {
+
+        Element party = xml.child(parent, "Cdtr");
+
+        xml.text(party, "Nm", requireName(transaction.getCreditorName(), "Cdtr"));
+
+        if (!notBlank(transaction.getCreditorCountry())) {
+            return;
+        }
+
+        Element address = xml.child(party, "PstlAdr");
+
+        xml.optional(address, "Ctry", transaction.getCreditorCountry());
+    }
+
+    private boolean notBlank(String value) {
+        return value != null && !value.isBlank();
     }
 
     private void account(XmlBuilder xml, Element parent, String name, String iban) {

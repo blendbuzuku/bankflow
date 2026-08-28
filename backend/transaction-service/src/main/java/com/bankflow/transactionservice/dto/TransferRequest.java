@@ -63,6 +63,10 @@ public class TransferRequest {
     @Size(max = 11)
     private String creditorAgentBic;
 
+    /** ISO 3166-1 alpha-2, which is what the scheme's Ctry element takes. */
+    @Size(max = 2)
+    private String creditorCountry;
+
     public TransferRequest() {
     }
 
@@ -120,6 +124,14 @@ public class TransferRequest {
 
     public void setCreditorIban(String creditorIban) {
         this.creditorIban = creditorIban;
+    }
+
+    public String getCreditorCountry() {
+        return creditorCountry;
+    }
+
+    public void setCreditorCountry(String creditorCountry) {
+        this.creditorCountry = creditorCountry;
     }
 
     public String getCreditorAgentBic() {
