@@ -43,17 +43,17 @@
         />
       </div>
 
-      @if (errorMessage) {
+      @if (errorMessage()) {
         <div class="error">
-          {{ errorMessage }}
+          {{ errorMessage() }}
         </div>
       }
 
       <button
         type="submit"
-        [disabled]="loading">
+        [disabled]="loading()">
 
-        @if (loading) {
+        @if (loading()) {
           Signing in...
         } @else {
           Sign in

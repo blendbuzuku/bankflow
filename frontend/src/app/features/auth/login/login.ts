@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 
@@ -20,19 +20,25 @@ export class Login {
   username = '';
   password = '';
 
-  loading = false;
-  errorMessage = '';
+  /*
+   * Signals, not plain fields. There is no zone here, so a field set from
+   * inside an HTTP callback never marks this component dirty -- the button
+   * would sit on its busy label after a rejected password until some
+   * unrelated click happened to force a check.
+   */
+  readonly loading = signal(false);
+  readonly errorMessage = signal('');
 
   login(): void {
 
     if (!this.username || !this.password) {
-      this.errorMessage = 'Username and password are required.';
+      this.errorMessage.set('Username and password are required.');
       this.toasts.error('Username and password are required.');
       return;
     }
 
-    this.loading = true;
-    this.errorMessage = '';
+    this.loading.set(true);
+    this.errorMessage.set('');
 
     this.authService.login(
       this.username,
@@ -49,7 +55,7 @@ export class Login {
         this.authService.loadCurrentUser().subscribe({
 
           next: user => {
-            this.loading = false;
+            this.loading.set(false);
 
             // A failed attempt is no longer news once you are in.
             this.toasts.clear();
@@ -65,9 +71,9 @@ export class Login {
           },
 
           error: () => {
-            this.loading = false;
+            this.loading.set(false);
             this.authService.logout();
-            this.errorMessage = 'Unable to load your user profile.';
+            this.errorMessage.set('Unable to load your user profile.');
             this.toasts.error(
               'Signed in, but your profile could not be loaded.',
               'Please try again.',
@@ -78,16 +84,16 @@ export class Login {
 
       error: error => {
 
-        this.loading = false;
+        this.loading.set(false);
 
         if (error.status === 401) {
-          this.errorMessage = 'Invalid username or password.';
+          this.errorMessage.set('Invalid username or password.');
           this.toasts.error(
             'Could not sign you in',
             'That username and password do not match an account.',
           );
         } else {
-          this.errorMessage = 'Unable to connect to BankFlow.';
+          this.errorMessage.set('Unable to connect to BankFlow.');
           this.toasts.error(
             'BankFlow is not responding',
             'The service could not be reached. Check it is running.',

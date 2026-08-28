@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth';
@@ -21,14 +21,19 @@ export class Register {
   password = '';
   confirmPassword = '';
 
-  errorMessage = '';
-  successMessage = '';
-  loading = false;
+  /*
+   * Signals, not plain fields, for the same reason as the sign-in form: with
+   * no zone, a field written from an HTTP callback leaves the button stuck on
+   * "Creating account..." until an unrelated click forces a check.
+   */
+  readonly errorMessage = signal('');
+  readonly successMessage = signal('');
+  readonly loading = signal(false);
 
   register(): void {
 
-    this.errorMessage = '';
-    this.successMessage = '';
+    this.errorMessage.set('');
+    this.successMessage.set('');
 
     if (
       !this.username ||
@@ -36,21 +41,21 @@ export class Register {
       !this.password ||
       !this.confirmPassword
     ) {
-      this.errorMessage = 'Please fill in all fields.';
+      this.errorMessage.set('Please fill in all fields.');
       return;
     }
 
     if (this.password !== this.confirmPassword) {
-      this.errorMessage = 'Passwords do not match.';
+      this.errorMessage.set('Passwords do not match.');
       return;
     }
 
     if (this.password.length < 8) {
-      this.errorMessage = 'Password must be at least 8 characters.';
+      this.errorMessage.set('Password must be at least 8 characters.');
       return;
     }
 
-    this.loading = true;
+    this.loading.set(true);
 
     this.authService.register({
       username: this.username,
@@ -58,8 +63,8 @@ export class Register {
       password: this.password,
     }).subscribe({
       next: () => {
-        this.loading = false;
-        this.successMessage = 'Account created successfully!';
+        this.loading.set(false);
+        this.successMessage.set('Account created successfully!');
         this.toasts.success(
           'Account created',
           'Sign in, then tell us your details so the branch can approve you.',
@@ -71,13 +76,14 @@ export class Register {
       },
 
       error: (error: any) => {
-        this.loading = false;
+        this.loading.set(false);
 
         console.error('Registration failed:', error);
 
-        this.errorMessage =
-          error?.error?.message ||
-          'Registration failed. Please try again.';
+        this.errorMessage.set(
+          error?.error?.message
+            || 'Registration failed. Please try again.',
+        );
       },
     });
   }

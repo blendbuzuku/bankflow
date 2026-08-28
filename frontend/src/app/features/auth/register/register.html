@@ -63,23 +63,23 @@
         />
       </div>
 
-      @if (errorMessage) {
+      @if (errorMessage()) {
         <div class="error-message">
-          {{ errorMessage }}
+          {{ errorMessage() }}
         </div>
       }
 
-      @if (successMessage) {
+      @if (successMessage()) {
         <div class="success-message">
-          {{ successMessage }}
+          {{ successMessage() }}
         </div>
       }
 
       <button
         type="submit"
-        [disabled]="loading"
+        [disabled]="loading()"
       >
-        @if (loading) {
+        @if (loading()) {
           Creating account...
         } @else {
           Create Account
