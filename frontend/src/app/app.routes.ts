@@ -13,6 +13,8 @@ import { Overview } from './features/operations/overview';
 import { Clients } from './features/operations/clients';
 import { EndOfDay } from './features/operations/end-of-day';
 import { Banks } from './features/operations/banks';
+import { Tariff } from './features/operations/tariff';
+import { KipsConsole } from './features/kips/kips-console';
 
 import { authGuard } from './core/guards/auth-guard';
 import { unsavedChangesGuard } from './core/guards/unsaved-changes';
@@ -141,6 +143,38 @@ export const routes: Routes = [
     data: {
       section: 'Scheme', sectionPath: '/messages',
       title: 'Bank directory',
+    },
+  },
+
+  /*
+   * What the bank charges decides what comes out of a customer's account
+   * without any payment being made, so it is guarded like the directory
+   * rather than like a screen a teller reads.
+   */
+  {
+    path: 'tariff',
+    component: Tariff,
+    canActivate: [supervisorGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: {
+      section: 'Banking', sectionPath: '/overview',
+      title: 'Tariff',
+    },
+  },
+
+  /*
+   * Playing the scheme is not banking, so it sits on its own. Guarded like
+   * the directory because the same roles hold the endpoints behind it: a
+   * teller cannot accept the payment they just sent.
+   */
+  {
+    path: 'kips',
+    component: KipsConsole,
+    canActivate: [supervisorGuard],
+    canDeactivate: [unsavedChangesGuard],
+    data: {
+      section: 'KIPS', sectionPath: '/kips',
+      title: 'Console',
     },
   },
 

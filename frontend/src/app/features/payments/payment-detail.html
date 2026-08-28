@@ -94,34 +94,18 @@
       <section class="card wide-card counterparty">
         <h2>Awaiting the counterparty</h2>
         <p class="explain">
-          The debtor has been debited and the pacs.008 has gone to KIPS. The money
-          is held in suspense until the receiving bank answers with a pacs.002.
-          There is no live KIPS link here, so you can play that answer yourself —
-          it is built as a real message and fed through the same inbound path a
-          genuine one would take.
+          The debtor has been debited and the pacs.008 has gone to KIPS. The
+          money is held in suspense until the receiving bank answers with a
+          pacs.002 — until then it is neither theirs nor ours.
         </p>
 
-        @if (simulateError()) { <div class="alert error">{{ simulateError() }}</div> }
+        <p class="explain">
+          The answer is not this bank's to give. With no live KIPS link you can
+          play it yourself, but that is done from the scheme's own console, not
+          from here.
+        </p>
 
-        <div class="sim">
-          <button type="button" class="accept" (click)="simulate('ACSC')"
-                  [disabled]="simulating()">
-            Accept (ACSC)
-          </button>
-
-          <span class="sim-or">or</span>
-
-          <select name="reason" [(ngModel)]="selectedReason">
-            @for (r of rejectionReasons; track r.code) {
-              <option [value]="r.code">{{ r.label }}</option>
-            }
-          </select>
-
-          <button type="button" class="reject" (click)="simulate('RJCT')"
-                  [disabled]="simulating()">
-            Reject (RJCT)
-          </button>
-        </div>
+        <a class="to-console" routerLink="/kips">Open the KIPS console</a>
       </section>
     }
 
@@ -137,12 +121,17 @@
             give, and it arrives as a payment return.
           </p>
 
-          <div class="sim">
-            <button type="button" class="accept" (click)="simulateReturn()"
-                    [disabled]="recalling()">
-              Play them agreeing (pacs.004)
-            </button>
-          </div>
+          @if (canSimulateReturn()) {
+            <p class="note">
+              Their answer arrives as a payment return. You can play it from the
+              <a routerLink="/kips">KIPS console</a>.
+            </p>
+          } @else {
+            <p class="note">
+              This payment has already come back, so there is nothing further
+              for the beneficiary bank to return.
+            </p>
+          }
 
         } @else if (showRecallForm()) {
           <p class="explain">
@@ -182,7 +171,8 @@
             can be asked back from the beneficiary's bank.
           </p>
 
-          <button type="button" class="secondary" (click)="toggleRecallForm()">
+          <button type="button" class="secondary" (click)="toggleRecallForm()"
+                  [disabled]="recalling()">
             Request a recall
           </button>
         }

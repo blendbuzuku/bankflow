@@ -1,0 +1,232 @@
+<div class="page">
+
+  <header class="page-head">
+    <h1>KIPS console</h1>
+    <p>
+      The scheme's side of the wire. Nothing here is the bank's to do — this is
+      where you play KIPS and the banks on the other end of it, and every action
+      is sent as a real ISO 20022 message down the same inbound path a genuine
+      one would take.
+    </p>
+  </header>
+
+  @if (loading()) {
+    <p class="status">Loading...</p>
+  } @else {
+
+    <section class="card queue">
+      <header class="queue-head">
+        <h2>Payments waiting for an answer</h2>
+        <p class="explain">
+          We have sent these and debited the customer. The money is held in
+          suspense until the receiving bank answers with a pacs.002 — until
+          then it is neither theirs nor ours.
+        </p>
+      </header>
+
+      @if (awaiting().length === 0) {
+        <p class="empty">Nothing is waiting. Every payment we sent has been answered.</p>
+      } @else {
+        <div class="rows">
+          @for (a of awaiting(); track a.transactionReference) {
+            <article class="row" [class.open]="isOpen(a)">
+
+              <div class="row-main" (click)="toggleRow(a)">
+                <div class="row-who">
+                  <strong>{{ who(a) }}</strong>
+                  <span class="mono iban">{{ a.creditorIban }}</span>
+                </div>
+
+                <div class="row-bank">
+                  <span class="mono">{{ a.creditorAgentBic }}</span>
+                  <span class="rail">{{ a.rail }}</span>
+                </div>
+
+                <div class="row-amount numeric">
+                  {{ a.amount | number: '1.2-2' }} {{ a.currency }}
+                </div>
+
+                <div class="row-when">{{ a.sentAt | date: 'dd MMM HH:mm' }}</div>
+
+                <button type="button" class="chevron"
+                        [attr.aria-expanded]="isOpen(a)"
+                        [attr.aria-label]="'Answer ' + a.transactionReference">
+                  <span aria-hidden="true"></span>
+                </button>
+              </div>
+
+              @if (isOpen(a)) {
+                <div class="row-answer">
+                  <p class="ref">
+                    <a [routerLink]="['/payments', a.transactionReference]">
+                      {{ a.transactionReference }}
+                    </a>
+                    — what does the beneficiary bank say?
+                  </p>
+
+                  <div class="answer-row">
+                    <button type="button" class="accept" (click)="accept(a)"
+                            [disabled]="busy()">
+                      Accept it (ACSC)
+                    </button>
+
+                    <span class="or">or</span>
+
+                    <select [(ngModel)]="rejectReason" name="rejectReason">
+                      @for (r of rejectionReasons; track r.code) {
+                        <option [value]="r.code">{{ r.label }}</option>
+                      }
+                    </select>
+
+                    <button type="button" class="reject" (click)="reject(a)"
+                            [disabled]="busy()">
+                      Reject it (RJCT)
+                    </button>
+                  </div>
+                </div>
+              }
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="card queue">
+      <header class="queue-head">
+        <h2>Payments that could still come back</h2>
+        <p class="explain">
+          These settled, but a beneficiary bank can send a payment back
+          afterwards — because the account turned out to be closed, or because
+          it agreed to a recall. The money returns; the charge for sending it
+          does not.
+        </p>
+      </header>
+
+      @if (returnable().length === 0) {
+        <p class="empty">No settled payments to send back.</p>
+      } @else {
+        <div class="rows">
+          @for (a of returnable(); track a.transactionReference) {
+            <article class="row" [class.open]="isOpen(a)"
+                     [class.asked]="a.recallId">
+
+              <div class="row-main" (click)="toggleRow(a)">
+                <div class="row-who">
+                  <strong>{{ who(a) }}</strong>
+                  <span class="mono iban">{{ a.creditorIban }}</span>
+                  @if (a.recallId) {
+                    <span class="pill">Recall asked ({{ a.recallReason }})</span>
+                  }
+                </div>
+
+                <div class="row-bank">
+                  <span class="mono">{{ a.creditorAgentBic }}</span>
+                  <span class="rail">{{ a.rail }}</span>
+                </div>
+
+                <div class="row-amount numeric">
+                  {{ a.amount | number: '1.2-2' }} {{ a.currency }}
+                </div>
+
+                <div class="row-when">{{ a.sentAt | date: 'dd MMM HH:mm' }}</div>
+
+                <button type="button" class="chevron"
+                        [attr.aria-expanded]="isOpen(a)"
+                        [attr.aria-label]="'Return ' + a.transactionReference">
+                  <span aria-hidden="true"></span>
+                </button>
+              </div>
+
+              @if (isOpen(a)) {
+                <div class="row-answer">
+                  @if (a.recallId) {
+                    <p class="ref">
+                      We asked for this back
+                      (<span class="mono">{{ a.recallId }}</span>). Sending it
+                      back is the beneficiary bank agreeing — there is no
+                      separate acceptance message.
+                    </p>
+                  } @else {
+                    <p class="ref">
+                      <a [routerLink]="['/payments', a.transactionReference]">
+                        {{ a.transactionReference }}
+                      </a>
+                      — the beneficiary bank is sending this back unasked.
+                    </p>
+                  }
+
+                  <div class="answer-row">
+                    <select [(ngModel)]="returnReason" name="returnReason">
+                      @for (r of returnReasons; track r.code) {
+                        <option [value]="r.code">{{ r.label }}</option>
+                      }
+                    </select>
+
+                    <input type="text" [(ngModel)]="returnAmount"
+                           name="returnAmount" class="amount-input"
+                           [placeholder]="a.amount | number: '1.2-2'" />
+
+                    <button type="button" class="reject" (click)="sendBack(a)"
+                            [disabled]="busy()">
+                      Send it back (pacs.004)
+                    </button>
+                  </div>
+
+                  <p class="hint">
+                    Leave the amount blank to return all of it. A smaller figure
+                    is what happens when the other bank keeps its own charges.
+                  </p>
+                </div>
+              }
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="card queue">
+      <header class="queue-head">
+        <h2>Deliver a message to us</h2>
+        <p class="explain">
+          Anything the scheme would push at us: a payment arriving from another
+          bank (pacs.008), or another bank asking for one of theirs back
+          (camt.056). It is validated against the KIPS schema exactly as a real
+          delivery would be, so a malformed message is refused here too.
+        </p>
+      </header>
+
+      <textarea class="xml-in" rows="8" [(ngModel)]="pasted" name="pasted"
+                placeholder="Paste the XML the scheme is delivering"></textarea>
+
+      <div class="answer-row">
+        <button type="button" class="accept" (click)="deliver()"
+                [disabled]="busy() || !pasted.trim()">
+          Deliver it
+        </button>
+        <button type="button" class="secondary" (click)="pasted = ''"
+                [disabled]="!pasted.trim()">
+          Clear
+        </button>
+      </div>
+    </section>
+
+    @if (lastMessage()) {
+      <section class="card">
+        <header class="queue-head">
+          <h2>{{ lastMessageTitle() }}</h2>
+          <p class="explain">
+            The message that went across, as it was actually written.
+          </p>
+        </header>
+
+        <app-message-view [xml]="lastMessage()" />
+
+        <div class="answer-row">
+          <button type="button" class="secondary" (click)="clearMessage()">
+            Close
+          </button>
+        </div>
+      </section>
+    }
+  }
+</div>

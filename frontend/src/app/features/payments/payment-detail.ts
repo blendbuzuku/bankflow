@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import {
   AuditEvent,
@@ -44,21 +44,6 @@ export class PaymentDetail implements OnInit {
   readonly messageXml = signal('');
   readonly xmlError = signal('');
 
-  /**
-   * Reason codes a counterparty realistically sends back, taken from the KIPS
-   * specification rather than the full ISO list.
-   */
-  readonly rejectionReasons = [
-    { code: 'AC01', label: 'AC01 — Incorrect account number' },
-    { code: 'AC04', label: 'AC04 — Account closed' },
-    { code: 'AC06', label: 'AC06 — Account blocked' },
-    { code: 'AM04', label: 'AM04 — Insufficient funds' },
-    { code: 'AM05', label: 'AM05 — Duplicate' },
-    { code: 'RR03', label: 'RR03 — Missing creditor name or address' },
-  ];
-
-  selectedReason = 'AC01';
-
   // --- recall ---
 
   readonly recalls = signal<RecallResponse[]>([]);
@@ -75,9 +60,6 @@ export class PaymentDetail implements OnInit {
     { code: 'AM05', label: 'Sent twice' },
     { code: 'RR04', label: 'Regulatory reason' },
   ];
-
-  readonly simulating = signal(false);
-  readonly simulateError = signal('');
 
   ngOnInit(): void {
 
@@ -143,6 +125,17 @@ export class PaymentDetail implements OnInit {
     return this.recalls().find(r => r.status === 'REQUESTED');
   }
 
+  /**
+   * Whether the counterparty can still be played agreeing.
+   *
+   * Only while the payment is settled and the money is still with them. Once
+   * it has come back the payment is RETURNED, there is nothing left to return,
+   * and offering it again invites booking the same reversal twice.
+   */
+  canSimulateReturn(): boolean {
+    return this.transaction()?.status === 'SETTLED' && !!this.openRecall();
+  }
+
   toggleRecallForm(): void {
     this.showRecallForm.set(!this.showRecallForm());
     this.recallNote = '';
@@ -179,33 +172,6 @@ export class PaymentDetail implements OnInit {
       });
   }
 
-  /** Plays the beneficiary bank agreeing and sending the money back. */
-  simulateReturn(): void {
-
-    const reference = this.transaction()?.transactionReference;
-
-    if (!reference) {
-      return;
-    }
-
-    this.recalling.set(true);
-
-    this.transactionService.simulateReturn(reference, 'AC04').subscribe({
-      next: () => {
-        this.recalling.set(false);
-        this.toasts.success(
-          'Payment returned',
-          'The funds are back with the debtor.',
-        );
-        this.reload(reference);
-      },
-      error: error => {
-        this.recalling.set(false);
-        this.toasts.failure('The return could not be simulated', error);
-      },
-    });
-  }
-
   private refreshMessages(reference: string): void {
 
     this.transactionService.messages(reference).subscribe({
@@ -219,35 +185,6 @@ export class PaymentDetail implements OnInit {
   /** Only a payment still in flight can receive a status report. */
   awaitingCounterparty(): boolean {
     return this.transaction()?.status === 'SENT';
-  }
-
-  simulate(status: 'ACSC' | 'RJCT'): void {
-
-    const reference = this.transaction()?.transactionReference;
-
-    if (!reference) {
-      return;
-    }
-
-    this.simulating.set(true);
-    this.simulateError.set('');
-
-    this.transactionService.simulateCounterpartyResponse(
-      reference,
-      status,
-      status === 'RJCT' ? this.selectedReason : undefined,
-    ).subscribe({
-      next: () => {
-        this.simulating.set(false);
-        this.reload(reference);
-      },
-      error: error => {
-        this.simulating.set(false);
-        this.simulateError.set(
-          error?.error?.message ?? 'The response could not be processed.',
-        );
-      },
-    });
   }
 
   private reload(reference: string): void {

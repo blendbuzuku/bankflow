@@ -1,0 +1,248 @@
+<div class="page">
+
+  <header class="page-head">
+    <h1>Tariff</h1>
+    <p>
+      What the bank charges, and what every payment is priced from. A price is
+      superseded rather than rewritten, so a charge on an old payment can still
+      be explained from the line that produced it.
+    </p>
+  </header>
+
+  @if (loading()) {
+    <p class="status">Loading...</p>
+  } @else {
+
+    @if (adding() || amending() !== null) {
+      <section class="card editor">
+        <h2>
+          @if (amending() !== null) { Reprice {{ form.ruleCode }} }
+          @else { Add a tariff line }
+        </h2>
+
+        @if (amending() !== null) {
+          <p class="explain">
+            The current line closes the day before this one starts, so the two
+            never both apply and nothing already charged is changed.
+          </p>
+        }
+
+        <div class="row">
+          <div class="field">
+            <label for="code">Code</label>
+            <input id="code" name="code" [(ngModel)]="form.ruleCode"
+                   maxlength="50" [disabled]="amending() !== null" />
+          </div>
+          <div class="field grow">
+            <label for="desc">What it charges for</label>
+            <input id="desc" name="desc" [(ngModel)]="form.description"
+                   maxlength="140"
+                   placeholder="Retail clearing, payments under 1,000" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="rail">Rail</label>
+            <select id="rail" name="rail" [(ngModel)]="form.paymentType">
+              @for (r of rails; track r.code) {
+                <option [value]="r.code">{{ r.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label for="cur">Currency</label>
+            <select id="cur" name="cur" [(ngModel)]="form.currency">
+              @for (c of currencies; track c) {
+                <option [value]="c">{{ c }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label for="minAmt">Band from</label>
+            <input id="minAmt" name="minAmt" type="number" step="0.01" min="0"
+                   [(ngModel)]="form.minAmount" />
+          </div>
+          <div class="field">
+            <label for="maxAmt">Band to</label>
+            <input id="maxAmt" name="maxAmt" type="number" step="0.01"
+                   [(ngModel)]="form.maxAmount" placeholder="No limit" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="fixed">Fixed charge</label>
+            <input id="fixed" name="fixed" type="number" step="0.01" min="0"
+                   [(ngModel)]="form.fixedFee" />
+          </div>
+          <div class="field">
+            <label for="pct">Percentage</label>
+            <input id="pct" name="pct" type="number" step="0.0001" min="0"
+                   [(ngModel)]="form.percentageRate" placeholder="0" />
+          </div>
+          <div class="field">
+            <label for="minFee">At least</label>
+            <input id="minFee" name="minFee" type="number" step="0.01" min="0"
+                   [(ngModel)]="form.minFee" placeholder="No floor" />
+          </div>
+          <div class="field">
+            <label for="maxFee">Capped at</label>
+            <input id="maxFee" name="maxFee" type="number" step="0.01" min="0"
+                   [(ngModel)]="form.maxFee" placeholder="No cap" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="from">
+              @if (amending() !== null) { Takes effect } @else { Effective from }
+            </label>
+            <input id="from" name="from" type="date" [(ngModel)]="form.validFrom" />
+          </div>
+        </div>
+
+        <!--
+          Priced here rather than left to be discovered on a customer's
+          statement. A percentage with a cap is easy to state and hard to
+          picture, and the figure below is the one somebody will be charged.
+        -->
+        <div class="worked">
+          <span class="worked-label">What this charges</span>
+          <div class="worked-rows">
+            @for (a of [50, 500, 5000, 50000]; track a) {
+              <div class="worked-row" [class.outside]="!inBand(a)">
+                <span class="on">on {{ a | number: '1.2-2' }}</span>
+                @if (inBand(a)) {
+                  <strong>{{ exampleCharge(a) | number: '1.2-2' }}</strong>
+                } @else {
+                  <span class="na">outside the band</span>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        @if (formError(); as problem) {
+          <p class="field-error">{{ problem }}</p>
+        }
+
+        <div class="actions">
+          <button type="button" class="primary" (click)="save()"
+                  [disabled]="busy() || !!formError()">
+            @if (amending() !== null) { Change the price } @else { Add the line }
+          </button>
+          <button type="button" class="secondary" (click)="cancel()">
+            Cancel
+          </button>
+        </div>
+      </section>
+    } @else {
+      <div class="toolbar">
+        <button type="button" class="primary" (click)="startAdd()">
+          Add a tariff line
+        </button>
+      </div>
+    }
+
+    <section class="card">
+      <h2>In use</h2>
+
+      @if (activeRules().length === 0) {
+        <p class="empty">
+          Nothing is priced. Every payment would be free.
+        </p>
+      } @else {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Rail</th>
+                <th>Currency</th>
+                <th>Band</th>
+                <th>Charge</th>
+                <th>From</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of activeRules(); track r.id) {
+                <tr>
+                  <td class="mono">{{ r.ruleCode }}</td>
+                  <td>{{ r.paymentTypeName }}</td>
+                  <td>{{ r.currency }}</td>
+                  <td class="numeric">{{ band(r) }}</td>
+                  <td>{{ pricing(r) }}</td>
+                  <td>{{ r.validFrom }}</td>
+                  <td class="row-actions">
+                    <button type="button" (click)="startAmend(r)"
+                            [disabled]="busy()">
+                      Reprice
+                    </button>
+                    <button type="button" class="danger" (click)="retire(r)"
+                            [disabled]="busy()">
+                      Retire
+                    </button>
+                  </td>
+                </tr>
+                <tr class="desc-row">
+                  <td colspan="7">{{ r.description }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    @if (retiredRules().length) {
+      <section class="card">
+        <h2>Not pricing today</h2>
+        <p class="explain">
+          Retired, already superseded, or not yet started. Kept because a past
+          line is what explains the charge on an older payment.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Rail</th>
+                <th>Band</th>
+                <th>Charge</th>
+                <th>Applied</th>
+                <th>Why</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of retiredRules(); track r.id) {
+                <tr class="retired">
+                  <td class="mono">{{ r.ruleCode }}</td>
+                  <td>{{ r.paymentTypeName }}</td>
+                  <td class="numeric">{{ band(r) }}</td>
+                  <td>{{ pricing(r) }}</td>
+                  <td>
+                    {{ r.validFrom }}
+                    @if (r.validTo) { to {{ r.validTo }} }
+                  </td>
+                  <td class="why">{{ whyInactive(r) }}</td>
+                  <td class="row-actions">
+                    @if (!r.active) {
+                      <button type="button" (click)="reinstate(r)"
+                              [disabled]="busy()">
+                        Put back
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+</div>

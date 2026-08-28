@@ -424,3 +424,71 @@
   color: #0f172a;
   margin-bottom: 1px;
 }
+
+/*
+ * The quiet option beside a coloured one.
+ *
+ * `.sim button` paints every button's text white for the accept and reject
+ * pair, which left this one white on white — present, clickable, and
+ * completely invisible.
+ */
+.sim button.secondary,
+button.secondary {
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid #d9e1ec;
+  border-radius: 9px;
+  background: #eef2f8;
+  color: #1e3a5f;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.sim button.secondary:hover:not(:disabled),
+button.secondary:hover:not(:disabled) { background: #e2e8f0; }
+
+button.secondary:disabled { opacity: .55; cursor: not-allowed; }
+
+.recall-panel .note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/*
+ * A pointer to the scheme console, not a control. Styled as a link rather than
+ * a button because pressing it does nothing to this payment — it moves you to
+ * where somebody else's decision gets made.
+ */
+.to-console {
+  align-self: flex-start;
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7c3aed;
+  text-decoration: none;
+  border-bottom: 1px solid #ddd6fe;
+  padding-bottom: 1px;
+}
+
+.to-console:hover {
+  border-bottom-color: #7c3aed;
+}
+
+.note a {
+  color: #7c3aed;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid #ddd6fe;
+}
+
+.note a:hover { border-bottom-color: #7c3aed; }

@@ -14,9 +14,10 @@
         @if (isStaff()) {
 
           <!--
-            Four areas, grouped by the job being done rather than by which
+            Five areas, grouped by the job being done rather than by which
             service happens to serve them: the counter, moving money, the
-            scheme interface, and what the books say.
+            scheme interface, what the books say -- and, kept apart from all
+            of them, the scheme's own side of the wire.
           -->
 
           <div class="menu" [class.open]="openMenu() === 'banking'">
@@ -37,6 +38,12 @@
                   <strong>Clients and accounts</strong>
                   <span>Approve clients, open accounts, handle cash</span>
                 </a>
+                @if (canApprove()) {
+                  <a routerLink="/tariff" routerLinkActive="active">
+                    <strong>Tariff</strong>
+                    <span>What the bank charges, and from when</span>
+                  </a>
+                }
               </div>
             }
           </div>
@@ -103,6 +110,38 @@
               </div>
             }
           </div>
+
+          <!--
+            The scheme is not part of the bank, and the menu says so by being
+            its own. Only the roles that may act as the counterparty see it.
+          -->
+          @if (canApprove()) {
+            <div class="menu" [class.open]="openMenu() === 'kips'">
+              <button type="button" class="menu-trigger"
+                      (click)="toggleMenu('kips', $event)"
+                      [attr.aria-expanded]="openMenu() === 'kips'">
+                KIPS
+                @if (schemeCount() > 0) {
+                  <span class="badge">{{ schemeCount() }}</span>
+                }
+                <span class="caret" aria-hidden="true"></span>
+              </button>
+
+              @if (openMenu() === 'kips') {
+                <div class="panel">
+                  <a routerLink="/kips" routerLinkActive="active">
+                    <strong>
+                      Console
+                      @if (schemeCount() > 0) {
+                        <span class="badge">{{ schemeCount() }}</span>
+                      }
+                    </strong>
+                    <span>Play the scheme: answer, return, deliver</span>
+                  </a>
+                </div>
+              }
+            </div>
+          }
 
           <div class="menu" [class.open]="openMenu() === 'reporting'">
             <button type="button" class="menu-trigger"

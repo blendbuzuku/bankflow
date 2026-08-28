@@ -1,0 +1,199 @@
+.page {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-head h1 { margin: 0 0 6px; font-size: 26px; color: #0f172a; }
+
+.page-head p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 68ch;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, .05);
+}
+
+.card h2 { margin: 0 0 6px; font-size: 16px; color: #0f172a; }
+
+.explain, .empty, .status {
+  margin: 0 0 12px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 70ch;
+}
+
+/* The editor is a price change, so it is marked off from the lists. */
+.editor { border-left: 4px solid #0f766e; }
+
+.row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 130px; }
+.field.grow { flex: 1; min-width: 240px; }
+
+.field label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.field input,
+.field select {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #0f172a;
+  background: #fff;
+  font-family: inherit;
+}
+
+.field input:disabled { background: #f1f5f9; color: #64748b; }
+
+/*
+ * The worked example: a percentage with a cap is easy to state and hard to
+ * picture, so the figures a customer would actually be charged are shown
+ * while the price is still being decided.
+ */
+.worked {
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 4px 0 14px;
+  background: #f8fafc;
+}
+
+.worked-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #0f766e;
+}
+
+.worked-rows {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.worked-row { display: flex; flex-direction: column; gap: 2px; }
+.worked-row .on { font-size: 11.5px; color: #94a3b8; }
+
+.worked-row strong {
+  font-size: 15px;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.worked-row .na { font-size: 12.5px; color: #cbd5e1; }
+.worked-row.outside .on { color: #cbd5e1; }
+
+.field-error {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #b91c1c;
+}
+
+.toolbar { display: flex; }
+
+.actions { display: flex; gap: 10px; }
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.primary { background: #0f766e; color: #fff; }
+.primary:hover:not(:disabled) { background: #115e59; }
+
+.secondary {
+  background: #fff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.secondary:hover:not(:disabled) { background: #f1f5f9; }
+
+.table-wrap { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; }
+
+table th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+table td {
+  padding: 10px 10px 10px 0;
+  font-size: 13px;
+  color: #0f172a;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+/* Digits line up so bands and charges can be compared down the column. */
+table td.numeric { font-variant-numeric: tabular-nums; }
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.desc-row td {
+  border-bottom: 1px solid #e5e7eb;
+  padding-top: 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.row-actions { display: flex; gap: 6px; }
+
+.row-actions button {
+  padding: 5px 10px;
+  font-size: 12px;
+  background: #fff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.row-actions button:hover:not(:disabled) { background: #f1f5f9; }
+
+.row-actions .danger { color: #b91c1c; border-color: #fecaca; }
+.row-actions .danger:hover:not(:disabled) { background: #fef2f2; }
+
+tr.retired td { color: #94a3b8; }
