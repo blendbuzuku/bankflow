@@ -64,6 +64,23 @@ public class CustomerPaymentService {
         }
 
         AuthenticatedUser customer = SecurityUtils.getCurrentUser();
+
+        /*
+         * Seeing an account and being able to empty it are different rights.
+         * A company can name several people on its account and only some of
+         * them may instruct; the screen hides the button for the others, but
+         * that is a convenience and this is the control.
+         */
+        String authority = accountClient.authorityFor(customer.userId())
+                .orElse("SIGNATORY");
+
+        if (!"SIGNATORY".equals(authority)) {
+            throw new AccessDeniedException(
+                    "You can see these accounts but you are not authorised to "
+                            + "instruct payments on them"
+            );
+        }
+
         Set<Long> ownAccounts = ownedAccountIds(customer.userId());
 
         /*

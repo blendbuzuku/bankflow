@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class AccountClient {
@@ -80,6 +81,37 @@ public class AccountClient {
                 .body(AccountResponse[].class);
 
         return accounts == null ? List.of() : Arrays.asList(accounts);
+    }
+
+    /**
+     * What a login may do for the client it acts for.
+     *
+     * Empty when the login acts for nobody, which is the ordinary case for
+     * staff. A company account can name several people, and only some of them
+     * are allowed to move money -- a bookkeeper who reconciles the statements
+     * should not be able to instruct a payment.
+     */
+    public Optional<String> authorityFor(Long userId) {
+
+        try {
+
+            Authority authority = restClient.get()
+                    .uri("/api/signatories/by-user/{userId}", userId)
+                    .header("Authorization",
+                            serviceTokenProvider.issueAuthorizationHeader())
+                    .retrieve()
+                    .body(Authority.class);
+
+            return authority == null
+                    ? Optional.empty()
+                    : Optional.ofNullable(authority.authority());
+
+        } catch (HttpClientErrorException.NotFound absent) {
+            return Optional.empty();
+        }
+    }
+
+    public record Authority(Long clientId, String authority) {
     }
 
     /**

@@ -1,5 +1,11 @@
  package com.bankflow.accountservice.service;
 
+import com.bankflow.accountservice.audit.AuditService;
+import com.bankflow.accountservice.dto.BeneficialOwnerRequest;
+import com.bankflow.accountservice.entity.BeneficialOwner;
+import com.bankflow.common.contact.Phone;
+import com.bankflow.common.geo.Country;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.accountservice.dto.ClientCreateRequest;
 import com.bankflow.accountservice.dto.ClientResponse;
 import com.bankflow.accountservice.entity.BusinessClient;
@@ -17,16 +23,32 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
+import com.bankflow.accountservice.entity.IdentityDocumentType;
+import com.bankflow.accountservice.entity.LegalForm;
+import java.time.LocalDate;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ClientService {
 
     private final ClientRepository clientRepository;
+    private final AuditService auditService;
+    private final ClientFieldValidator fieldValidator;
+    private final SignatoryService signatoryService;
 
-    public ClientService(ClientRepository clientRepository) {
+    public ClientService(
+            ClientRepository clientRepository,
+            AuditService auditService,
+            ClientFieldValidator fieldValidator,
+            SignatoryService signatoryService) {
+
         this.clientRepository = clientRepository;
+        this.auditService = auditService;
+        this.fieldValidator = fieldValidator;
+        this.signatoryService = signatoryService;
     }
 
     /**
@@ -53,6 +75,12 @@ public class ClientService {
 
     private ClientResponse persist(ClientCreateRequest request, Long userId) {
 
+        /*
+         * Checked before the duplicate lookup, so somebody typing a malformed
+         * address is told that rather than being told it is already taken.
+         */
+        fieldValidator.validate(request);
+
         if (clientRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException(
                     "Client with this email already exists"
@@ -65,9 +93,23 @@ public class ClientService {
 
             IndividualClient individual = new IndividualClient();
 
-            individual.setFirstName(request.getFirstName());
-            individual.setLastName(request.getLastName());
+            individual.setFirstName(request.getFirstName().trim());
+            individual.setLastName(request.getLastName().trim());
             individual.setDateOfBirth(request.getDateOfBirth());
+
+            individual.setPlaceOfBirth(trimmed(request.getPlaceOfBirth()));
+            individual.setCountryOfBirth(Country.normalise(request.getCountryOfBirth()));
+            individual.setNationality(Country.normalise(request.getNationality()));
+            individual.setCountryOfResidence(
+                    Country.normalise(request.getCountryOfResidence()));
+
+            individual.setIdentityDocumentType(request.getIdentityDocumentType());
+            individual.setIdentityDocumentNumber(
+                    upper(request.getIdentityDocumentNumber()));
+            individual.setIdentityDocumentCountry(
+                    Country.normalise(request.getIdentityDocumentCountry()));
+            individual.setIdentityDocumentExpiry(request.getIdentityDocumentExpiry());
+            individual.setPersonalNumber(trimmed(request.getPersonalNumber()));
 
             client = individual;
 
@@ -79,8 +121,22 @@ public class ClientService {
             business.setRegistrationNumber(
                     request.getRegistrationNumber()
             );
-            business.setTaxNumber(request.getTaxNumber());
-            business.setIndustry(request.getIndustry());
+            business.setTaxNumber(upper(request.getTaxNumber()));
+            business.setIndustry(trimmed(request.getIndustry()));
+
+            business.setLegalForm(request.getLegalForm());
+            business.setDateOfIncorporation(request.getDateOfIncorporation());
+            business.setNaceCode(upper(request.getNaceCode()));
+
+            /*
+             * Added through the entity so the cascade writes the foreign key.
+             * A company with no owners never reaches here -- the validator
+             * refuses it -- so an empty list would be a bug, not a business
+             * case.
+             */
+            for (BeneficialOwnerRequest declared : request.getBeneficialOwners()) {
+                business.addBeneficialOwner(toOwner(declared));
+            }
 
             client = business;
 
@@ -92,8 +148,25 @@ public class ClientService {
         }
 
         client.setUserId(userId);
-        client.setEmail(request.getEmail());
-        client.setPhone(request.getPhone());
+        client.setEmail(request.getEmail().trim().toLowerCase());
+
+        /*
+         * Stored dialled, not written. A number kept as "044 123 456" is
+         * meaningless to anyone outside Kosovo, and this bank's customers are
+         * routinely outside Kosovo.
+         */
+        client.setPhone(Phone.normalise(request.getPhone()));
+
+        client.setAddressLine1(trimmed(request.getAddressLine1()));
+        client.setAddressLine2(trimmed(request.getAddressLine2()));
+        client.setCity(trimmed(request.getCity()));
+        client.setPostalCode(trimmed(request.getPostalCode()));
+        client.setCountry(Country.normalise(request.getCountry()));
+
+        client.setPoliticallyExposed(request.isPoliticallyExposed());
+        client.setPepDetails(trimmed(request.getPepDetails()));
+        client.setSourceOfFunds(request.getSourceOfFunds());
+        client.setSourceOfFundsDetail(trimmed(request.getSourceOfFundsDetail()));
 
         /*
          * A new client is unapproved until someone has checked who they are.
@@ -101,7 +174,32 @@ public class ClientService {
          */
         client.setStatus(ClientStatus.PENDING.name());
 
-        return mapToResponse(clientRepository.save(client));
+        Client saved = clientRepository.save(client);
+
+        /*
+         * The registrant becomes the client's first signatory, so there is one
+         * rule for resolving a login rather than a special case for people and
+         * another for companies.
+         */
+        signatoryService.recordRegistrant(saved.getId(), userId);
+
+        Map<String, Object> details = new LinkedHashMap<>();
+
+        details.put("clientType", request.getClientType());
+        details.put("email", request.getEmail());
+        details.put("boundToUserId", userId);
+        details.put("status", ClientStatus.PENDING.name());
+
+        auditService.record(
+                AuditEventType.CLIENT_REGISTERED,
+                "Client",
+                String.valueOf(saved.getId()),
+                "%s registered as a client, pending approval".formatted(
+                        request.getEmail()),
+                details
+        );
+
+        return mapToResponse(saved);
     }
 
     /** The client book. Staff only — this is the whole customer base. */
@@ -188,9 +286,33 @@ public class ClientService {
             throw new BusinessException("A closed client cannot be reopened");
         }
 
+        String previous = client.getStatus();
+
         client.setStatus(ClientStatus.ACTIVE.name());
 
-        return mapToResponse(clientRepository.save(client));
+        Client saved = clientRepository.save(client);
+
+        Map<String, Object> details = new LinkedHashMap<>();
+
+        details.put("previousStatus", previous);
+        details.put("status", ClientStatus.ACTIVE.name());
+        details.put("email", saved.getEmail());
+        details.put("boundToUserId", saved.getUserId());
+
+        /*
+         * The actor is not passed in: AuditService takes it from the security
+         * context, so the name on the record is the one that authenticated.
+         */
+        auditService.record(
+                AuditEventType.CLIENT_APPROVED,
+                "Client",
+                String.valueOf(saved.getId()),
+                "Client %s approved and may now be given accounts".formatted(
+                        saved.getEmail()),
+                details
+        );
+
+        return mapToResponse(saved);
     }
 
     /**
@@ -205,9 +327,28 @@ public class ClientService {
                         "Client not found with id: " + clientId
                 ));
 
+        String previous = client.getStatus();
+
         client.setStatus(ClientStatus.SUSPENDED.name());
 
-        return mapToResponse(clientRepository.save(client));
+        Client saved = clientRepository.save(client);
+
+        Map<String, Object> details = new LinkedHashMap<>();
+
+        details.put("previousStatus", previous);
+        details.put("status", ClientStatus.SUSPENDED.name());
+        details.put("email", saved.getEmail());
+
+        auditService.record(
+                AuditEventType.CLIENT_SUSPENDED,
+                "Client",
+                String.valueOf(saved.getId()),
+                "Client %s suspended; nothing further can be opened for them"
+                        .formatted(saved.getEmail()),
+                details
+        );
+
+        return mapToResponse(saved);
     }
 
     /**
@@ -239,13 +380,17 @@ public class ClientService {
 
         Long userId = SecurityUtils.getCurrentUserId();
 
-        Client client =
-                clientRepository.findByUserId(userId)
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "No client profile exists for the current user"
-                                )
-                        );
+        /*
+         * Through the signatory table, so somebody added to a company account
+         * sees the company rather than being told they have no profile.
+         */
+        Client client = signatoryService.clientIdFor(userId)
+                .flatMap(clientRepository::findById)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "No client profile exists for the current user"
+                        )
+                );
 
         return mapToResponse(client);
     }
@@ -374,10 +519,35 @@ public class ClientService {
         String taxNumber = null;
         String industry = null;
 
+        String placeOfBirth = null;
+        String countryOfBirth = null;
+        String nationality = null;
+        String countryOfResidence = null;
+
+        IdentityDocumentType documentType = null;
+        String documentNumber = null;
+        String documentCountry = null;
+        LocalDate documentExpiry = null;
+
+        LegalForm legalForm = null;
+        LocalDate incorporated = null;
+        String naceCode = null;
+        List<ClientResponse.BeneficialOwnerResponse> owners = List.of();
+
         if (client instanceof IndividualClient individual) {
 
             firstName = individual.getFirstName();
             lastName = individual.getLastName();
+
+            placeOfBirth = individual.getPlaceOfBirth();
+            countryOfBirth = individual.getCountryOfBirth();
+            nationality = individual.getNationality();
+            countryOfResidence = individual.getCountryOfResidence();
+
+            documentType = individual.getIdentityDocumentType();
+            documentNumber = maskDocument(individual.getIdentityDocumentNumber());
+            documentCountry = individual.getIdentityDocumentCountry();
+            documentExpiry = individual.getIdentityDocumentExpiry();
 
         } else if (client instanceof BusinessClient business) {
 
@@ -388,6 +558,24 @@ public class ClientService {
                     business.getTaxNumber();
             industry =
                     business.getIndustry();
+
+            legalForm = business.getLegalForm();
+            incorporated = business.getDateOfIncorporation();
+            naceCode = business.getNaceCode();
+
+            owners = business.getBeneficialOwners()
+                    .stream()
+                    .map(owner -> new ClientResponse.BeneficialOwnerResponse(
+                            owner.getId(),
+                            owner.getFullName(),
+                            owner.getDateOfBirth(),
+                            owner.getNationality(),
+                            owner.getCountryOfResidence(),
+                            owner.getOwnershipPercentage(),
+                            owner.isControlsByOtherMeans(),
+                            owner.isPoliticallyExposed()
+                    ))
+                    .toList();
         }
 
         return new ClientResponse(
@@ -411,8 +599,77 @@ public class ClientService {
                 taxNumber,
                 industry,
 
+                client.getAddressLine1(),
+                client.getAddressLine2(),
+                client.getCity(),
+                client.getPostalCode(),
+                client.getCountry(),
+
+                placeOfBirth,
+                countryOfBirth,
+                nationality,
+                countryOfResidence,
+
+                documentType,
+                documentNumber,
+                documentCountry,
+                documentExpiry,
+
+                client.isPoliticallyExposed(),
+                client.getPepDetails(),
+                client.getSourceOfFunds(),
+
+                legalForm,
+                incorporated,
+                naceCode,
+                owners,
+
                 client.getCreatedAt(),
                 client.getUpdatedAt()
         );
+    }
+
+
+    /**
+     * Shows enough of a document number to confirm it, and no more.
+     *
+     * A teller comparing the passport in front of them against the record
+     * needs the last few characters; nobody needs the whole number on a
+     * screen, and a full one there is a full one in a screenshot.
+     */
+    private String maskDocument(String number) {
+
+        if (number == null || number.length() <= 4) {
+            return number;
+        }
+
+        return "*".repeat(number.length() - 4)
+                + number.substring(number.length() - 4);
+    }
+
+    private BeneficialOwner toOwner(BeneficialOwnerRequest declared) {
+
+        BeneficialOwner owner = new BeneficialOwner();
+
+        owner.setFullName(declared.getFullName().trim());
+        owner.setDateOfBirth(declared.getDateOfBirth());
+        owner.setNationality(Country.normalise(declared.getNationality()));
+        owner.setCountryOfResidence(
+                Country.normalise(declared.getCountryOfResidence()));
+        owner.setOwnershipPercentage(declared.getOwnershipPercentage());
+        owner.setControlsByOtherMeans(declared.isControlsByOtherMeans());
+        owner.setPoliticallyExposed(declared.isPoliticallyExposed());
+
+        return owner;
+    }
+
+    /** Blank and whitespace mean the same as absent for every optional field. */
+    private String trimmed(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** Document, tax and sector codes are compared, so they are stored upper. */
+    private String upper(String value) {
+        return value == null || value.isBlank() ? null : value.trim().toUpperCase();
     }
 }
