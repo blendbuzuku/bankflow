@@ -3,11 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 /**
- * SUSPENSE and INCOME are the bank's own general ledger accounts, not customer
+ * SUSPENSE, INCOME and VAULT are the bank's own general ledger accounts, not customer
  * products. They never appear in a customer's own list, but staff screens see
  * them, so the type has to admit them.
  */
-export type AccountType = 'CURRENT' | 'SAVINGS' | 'SUSPENSE' | 'INCOME';
+export type AccountType =
+  | 'CURRENT' | 'SAVINGS' | 'SUSPENSE' | 'INCOME' | 'VAULT';
 export type AccountStatus = 'ACTIVE' | 'BLOCKED' | 'CLOSED';
 export type Currency = 'EUR' | 'USD' | 'GBP' | 'CHF';
 export type ClientType = 'INDIVIDUAL' | 'BUSINESS';
@@ -48,8 +49,66 @@ export interface ClientResponse {
   registrationNumber: string | null;
   taxNumber: string | null;
   industry: string | null;
+
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  postalCode: string | null;
+  country: string | null;
+
+  placeOfBirth: string | null;
+  countryOfBirth: string | null;
+  nationality: string | null;
+  countryOfResidence: string | null;
+
+  identityDocumentType: string | null;
+  /** Masked to its last four characters by the server. */
+  identityDocumentNumber: string | null;
+  identityDocumentCountry: string | null;
+  identityDocumentExpiry: string | null;
+
+  politicallyExposed: boolean;
+  pepDetails: string | null;
+  sourceOfFunds: string | null;
+
+  legalForm: string | null;
+  dateOfIncorporation: string | null;
+  naceCode: string | null;
+  beneficialOwners: {
+    id: number;
+    fullName: string;
+    dateOfBirth: string;
+    nationality: string | null;
+    countryOfResidence: string | null;
+    ownershipPercentage: number;
+    controlsByOtherMeans: boolean;
+    politicallyExposed: boolean;
+  }[];
+
   createdAt: string;
   updatedAt: string;
+}
+
+export type IdentityDocumentType =
+  | 'PASSPORT' | 'NATIONAL_ID' | 'RESIDENCE_PERMIT';
+
+export type SourceOfFunds =
+  | 'SALARY' | 'BUSINESS_INCOME' | 'PENSION' | 'SAVINGS' | 'INVESTMENTS'
+  | 'PROPERTY_SALE' | 'INHERITANCE' | 'REMITTANCES' | 'OTHER';
+
+export type LegalForm =
+  | 'SOLE_PROPRIETORSHIP' | 'GENERAL_PARTNERSHIP' | 'LIMITED_PARTNERSHIP'
+  | 'LIMITED_LIABILITY' | 'JOINT_STOCK' | 'FOREIGN_BRANCH' | 'NGO' | 'OTHER';
+
+/** A human being declared as owning or controlling a company. */
+export interface BeneficialOwnerRequest {
+  fullName: string;
+  dateOfBirth: string;
+  nationality?: string;
+  countryOfResidence?: string;
+  ownershipPercentage: number;
+  controlsByOtherMeans: boolean;
+  politicallyExposed: boolean;
 }
 
 export interface ClientCreateRequest {
@@ -63,6 +122,33 @@ export interface ClientCreateRequest {
   industry?: string;
   email: string;
   phone?: string;
+
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  postalCode?: string;
+  country?: string;
+
+  placeOfBirth?: string;
+  countryOfBirth?: string;
+  nationality?: string;
+  countryOfResidence?: string;
+
+  identityDocumentType?: IdentityDocumentType;
+  identityDocumentNumber?: string;
+  identityDocumentCountry?: string;
+  identityDocumentExpiry?: string;
+  personalNumber?: string;
+
+  politicallyExposed?: boolean;
+  pepDetails?: string;
+  sourceOfFunds?: SourceOfFunds;
+  sourceOfFundsDetail?: string;
+
+  legalForm?: LegalForm;
+  dateOfIncorporation?: string;
+  naceCode?: string;
+  beneficialOwners?: BeneficialOwnerRequest[];
 }
 
 export interface AccountCreateRequest {

@@ -44,6 +44,29 @@ export class Clients implements OnInit, HasUnsavedChanges {
       || this.cashNarrative.trim());
   }
 
+  /*
+   * The two resets below empty exactly what the check above looks at, and are
+   * kept beside it for that reason. Apart, they drifted: opening an account
+   * cleared the purpose but not the client, so a teller who had just opened
+   * one successfully was warned they were about to lose unsaved work.
+   *
+   * Two screens' worth of form, so two resets -- paying cash in should not
+   * wipe the account somebody is part-way through opening.
+   */
+
+  private resetAccountForm(): void {
+    this.newAccountClientId = null;
+    this.newAccountType = 'CURRENT';
+    this.newAccountCurrency = 'EUR';
+    this.newAccountPurpose = '';
+  }
+
+  private resetCashForm(): void {
+    this.cashAccountId = null;
+    this.cashAmount = null;
+    this.cashNarrative = '';
+  }
+
 
   private readonly accountService = inject(AccountService);
   private readonly transactionService = inject(TransactionService);
@@ -178,6 +201,141 @@ export class Clients implements OnInit, HasUnsavedChanges {
         || 'Individual client';
   }
 
+  /*
+   * Approving a client is somebody vouching that they are who they say they
+   * are, so the evidence has to be in front of the person doing it. The card
+   * used to show a name, a type and an email -- none of which anybody checked
+   * anything against.
+   */
+
+  /** Open by default while pending: that is when it needs reading. */
+  readonly expanded = signal(new Set<number>());
+
+  toggleDetails(clientId: number): void {
+
+    const open = new Set(this.expanded());
+
+    if (!open.delete(clientId)) {
+      open.add(clientId);
+    }
+
+    this.expanded.set(open);
+  }
+
+  showsDetails(client: ClientResponse): boolean {
+    return this.expanded().has(client.id) || this.isPending(client);
+  }
+
+  /** One line of address, in the order it would be written on an envelope. */
+  address(client: ClientResponse): string {
+
+    return [
+      client.addressLine1,
+      client.addressLine2,
+      client.postalCode,
+      client.city,
+      client.country,
+    ].filter(part => !!part).join(', ');
+  }
+
+  documentSummary(client: ClientResponse): string {
+
+    if (!client.identityDocumentType) {
+      return 'None recorded';
+    }
+
+    const label = client.identityDocumentType
+      .toLowerCase()
+      .replace(/_/g, ' ');
+
+    return `${label} ${client.identityDocumentNumber ?? ''}`.trim()
+      + (client.identityDocumentCountry
+        ? `, issued by ${client.identityDocumentCountry}` : '');
+  }
+
+  /**
+   * Whether the document on file has run out, or is about to.
+   *
+   * An expired document identifies nobody, and one expiring next month will
+   * need chasing -- better said at the point of approval than discovered when
+   * a payment is queried.
+   */
+  documentWarning(client: ClientResponse): string | null {
+
+    if (!client.identityDocumentExpiry) {
+      return null;
+    }
+
+    const expiry = new Date(client.identityDocumentExpiry);
+    const today = new Date();
+
+    if (expiry <= today) {
+      return `Expired on ${client.identityDocumentExpiry}`;
+    }
+
+    const days = Math.round(
+      (expiry.getTime() - today.getTime()) / 86_400_000,
+    );
+
+    return days <= 90
+      ? `Expires in ${days} days, on ${client.identityDocumentExpiry}`
+      : null;
+  }
+
+  /**
+   * What ought to be looked at twice before approving.
+   *
+   * Not reasons to refuse -- a politically exposed customer is an ordinary
+   * customer under closer watch, and so is one living abroad. They are the
+   * facts a reviewer would want raised rather than buried in a field.
+   */
+  flags(client: ClientResponse): string[] {
+
+    const raised: string[] = [];
+
+    if (client.politicallyExposed) {
+      raised.push(
+        `Politically exposed${client.pepDetails ? ': ' + client.pepDetails : ''}`,
+      );
+    }
+
+    const warning = this.documentWarning(client);
+
+    if (warning) {
+      raised.push(`Identity document: ${warning.toLowerCase()}`);
+    }
+
+    if (client.countryOfResidence && client.countryOfResidence !== 'XK') {
+      raised.push(`Resident outside Kosovo (${client.countryOfResidence})`);
+    }
+
+    if (client.beneficialOwners?.length) {
+
+      const declared = client.beneficialOwners
+        .reduce((total, owner) => total + owner.ownershipPercentage, 0);
+
+      if (declared < 75) {
+        raised.push(
+          `Declared owners account for ${declared}% of the company`,
+        );
+      }
+
+      if (client.beneficialOwners.some(owner => owner.politicallyExposed)) {
+        raised.push('A beneficial owner is politically exposed');
+      }
+    }
+
+    return raised;
+  }
+
+  /** Reads a source-of-funds code the way somebody would say it. */
+  sourceOfFunds(client: ClientResponse): string {
+
+    return client.sourceOfFunds
+      ? client.sourceOfFunds.toLowerCase().replace(/_/g, ' ')
+      : 'Not stated';
+  }
+
   isPending(client: ClientResponse): boolean {
     return client.status === 'PENDING';
   }
@@ -251,7 +409,7 @@ export class Clients implements OnInit, HasUnsavedChanges {
           `${account.accountType} ${account.currency} account opened`,
           `${account.iban} for ${account.clientName}.`,
         );
-        this.newAccountPurpose = '';
+        this.resetAccountForm();
         this.load();
       },
       error: error => {
@@ -293,8 +451,7 @@ export class Clients implements OnInit, HasUnsavedChanges {
           + `${transaction.amount} ${transaction.currency}`,
           `Booked as ${transaction.transactionReference}.`,
         );
-        this.cashAmount = null;
-        this.cashNarrative = '';
+        this.resetCashForm();
         this.load();
       },
       error: error => {

@@ -4,11 +4,15 @@
   <p class="lead">
     Your sign-in account is ready. To hold money you also need a client record —
     this is what accounts are opened against.
+    <span class="legend">Fields marked <span class="req">*</span> are required.</span>
   </p>
 
   @if (error()) { <div class="alert error">{{ error() }}</div> }
 
   <form (ngSubmit)="submit()">
+
+    <fieldset class="group">
+      <legend>Who you are</legend>
 
     <div class="field">
       <label for="ctype">You are</label>
@@ -29,6 +33,7 @@
         <div class="field">
           <label for="regNo">Registration number</label>
           <input id="regNo" name="regNo" [(ngModel)]="registrationNumber"
+                 [class.bad]="registrationError()"
                  placeholder="Company registration" />
         </div>
         <div class="field">
@@ -45,17 +50,34 @@
       <div class="row">
         <div class="field">
           <label for="firstName">First name</label>
-          <input id="firstName" name="firstName" [(ngModel)]="firstName" maxlength="50" />
+          <input id="firstName" name="firstName" [(ngModel)]="firstName" maxlength="50"
+                 [class.bad]="firstNameError()" />
+          @if (firstNameError(); as problem) {
+            <p class="field-error">{{ problem }}</p>
+          }
         </div>
         <div class="field">
           <label for="lastName">Last name</label>
-          <input id="lastName" name="lastName" [(ngModel)]="lastName" maxlength="50" />
+          <input id="lastName" name="lastName" [(ngModel)]="lastName" maxlength="50"
+                 [class.bad]="lastNameError()" />
+          @if (lastNameError(); as problem) {
+            <p class="field-error">{{ problem }}</p>
+          }
         </div>
       </div>
 
       <div class="field">
-        <label for="dob">Date of birth</label>
-        <input id="dob" name="dob" type="date" [(ngModel)]="dateOfBirth" />
+        <label for="dob">Date of birth <span class="req" aria-hidden="true">*</span></label>
+        <input id="dob" name="dob" type="date" [(ngModel)]="dateOfBirth"
+               [class.bad]="dateOfBirthError()" />
+        @if (dateOfBirthError(); as problem) {
+          <p class="field-error">{{ problem }}</p>
+        } @else {
+          <p class="hint">
+            How two customers with the same name are told apart, and what
+            travels with a payment when an address does not.
+          </p>
+        }
       </div>
     }
 
@@ -63,13 +85,402 @@
       <div class="field grow">
         <label for="email">Email</label>
         <input id="email" name="email" type="email" [(ngModel)]="email"
+               [class.bad]="emailError()"
                placeholder="you@example.com" />
+        @if (emailError(); as problem) {
+          <p class="field-error">{{ problem }}</p>
+        }
       </div>
       <div class="field">
-        <label for="phone">Phone</label>
-        <input id="phone" name="phone" [(ngModel)]="phone" placeholder="Optional" />
+        <label for="phone">Phone <span class="req" aria-hidden="true">*</span></label>
+        <input id="phone" name="phone" [(ngModel)]="phone"
+               [class.bad]="phoneError()"
+               placeholder="+383 44 123 456" />
+        @if (phoneError(); as problem) {
+          <p class="field-error">{{ problem }}</p>
+        } @else {
+          <p class="hint">With the country code, so it dials from anywhere.</p>
+        }
       </div>
     </div>
+    </fieldset>
+
+    <!--
+      Everything below is what makes this a bank record of a person rather
+      than a contact list entry: an address that travels with their payments,
+      a document somebody examined, and where the money is expected to come
+      from. None of it was being asked for.
+    -->
+    <fieldset class="group">
+      <legend>Where you live</legend>
+      <p class="group-note">
+        This travels with every payment you make. The receiving bank has little
+        else to identify you by.
+      </p>
+
+      <div class="field">
+        <label for="addr1">Street address <span class="req" aria-hidden="true">*</span></label>
+        <input id="addr1" name="addr1" [(ngModel)]="addressLine1" maxlength="70"
+               [class.bad]="addressError()" placeholder="Rruga B, Nr. 12" />
+        @if (addressError(); as problem) {
+          <p class="field-error">{{ problem }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="addr2">Flat, floor or second line</label>
+        <input id="addr2" name="addr2" [(ngModel)]="addressLine2" maxlength="70"
+               placeholder="Optional" />
+      </div>
+
+      <div class="row">
+        <div class="field grow">
+          <label for="city">Town or city <span class="req" aria-hidden="true">*</span></label>
+          <input id="city" name="city" [(ngModel)]="city" maxlength="35"
+                 [class.bad]="cityError()" />
+          @if (cityError(); as problem) {
+            <p class="field-error">{{ problem }}</p>
+          }
+        </div>
+        <div class="field narrow">
+          <label for="postcode">Postal code</label>
+          <input id="postcode" name="postcode" [(ngModel)]="postalCode"
+                 maxlength="16" placeholder="10000" />
+        </div>
+        <div class="field country">
+          <label for="country">Country <span class="req" aria-hidden="true">*</span></label>
+          <select id="country" name="country" [(ngModel)]="country">
+            <option value="">Choose a country</option>
+            <optgroup label="Commonly chosen">
+              @for (c of commonCountries; track c.code) {
+                <option [value]="c.code">{{ c.name }}</option>
+              }
+            </optgroup>
+            <optgroup label="All countries">
+              @for (c of otherCountries; track c.code) {
+                <option [value]="c.code">{{ c.name }}</option>
+              }
+            </optgroup>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    @if (!isBusiness()) {
+      <fieldset class="group">
+        <legend>Proof of identity</legend>
+        <p class="group-note">
+          The document a member of staff checks against you. Without it there is
+          nothing behind the name on the account.
+        </p>
+
+        <div class="row">
+          <div class="field grow">
+            <label for="doctype">Document <span class="req" aria-hidden="true">*</span></label>
+            <select id="doctype" name="doctype" [(ngModel)]="identityDocumentType">
+              <option value="">Choose a document</option>
+              @for (d of documentTypes; track d.value) {
+                <option [value]="d.value">{{ d.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="field grow">
+            <label for="docnum">Number <span class="req" aria-hidden="true">*</span></label>
+            <input id="docnum" name="docnum" [(ngModel)]="identityDocumentNumber"
+                   maxlength="40" [class.bad]="documentNumberError()" />
+            @if (documentNumberError(); as problem) {
+              <p class="field-error">{{ problem }}</p>
+            }
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field country">
+            <label for="doccountry">Issued by <span class="req" aria-hidden="true">*</span></label>
+            <select id="doccountry" name="doccountry" [(ngModel)]="identityDocumentCountry">
+              <option value="">Choose a country</option>
+              <optgroup label="Commonly chosen">
+                @for (c of commonCountries; track c.code) {
+                  <option [value]="c.code">{{ c.name }}</option>
+                }
+              </optgroup>
+              <optgroup label="All countries">
+                @for (c of otherCountries; track c.code) {
+                  <option [value]="c.code">{{ c.name }}</option>
+                }
+              </optgroup>
+            </select>
+          </div>
+          <div class="field grow">
+            <label for="docexp">Expires <span class="req" aria-hidden="true">*</span></label>
+            <input id="docexp" name="docexp" type="date"
+                   [(ngModel)]="identityDocumentExpiry"
+                   [class.bad]="documentExpiryError()" />
+            @if (documentExpiryError(); as problem) {
+              <p class="field-error">{{ problem }}</p>
+            } @else {
+              <p class="hint">So we know when to ask for a current one.</p>
+            }
+          </div>
+          <div class="field grow">
+            <label for="pnum">Personal number</label>
+            <input id="pnum" name="pnum" [(ngModel)]="personalNumber"
+                   maxlength="20" [class.bad]="personalNumberError()"
+                   placeholder="Optional" />
+            @if (personalNumberError(); as problem) {
+              <p class="field-error">{{ problem }}</p>
+            }
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>Origins</legend>
+
+        <div class="row">
+          <div class="field grow">
+            <label for="pob">Place of birth <span class="req" aria-hidden="true">*</span></label>
+            <input id="pob" name="pob" [(ngModel)]="placeOfBirth" maxlength="35"
+                   placeholder="Prishtina" />
+          </div>
+          <div class="field country">
+            <label for="cob">Born in</label>
+            <select id="cob" name="cob" [(ngModel)]="countryOfBirth">
+              <option value="">Choose a country</option>
+              <optgroup label="Commonly chosen">
+                @for (c of commonCountries; track c.code) {
+                  <option [value]="c.code">{{ c.name }}</option>
+                }
+              </optgroup>
+              <optgroup label="All countries">
+                @for (c of otherCountries; track c.code) {
+                  <option [value]="c.code">{{ c.name }}</option>
+                }
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field country">
+            <label for="nat">Nationality <span class="req" aria-hidden="true">*</span></label>
+            <select id="nat" name="nat" [(ngModel)]="nationality">
+              <option value="">Choose a country</option>
+              <optgroup label="Commonly chosen">
+                @for (c of commonCountries; track c.code) {
+                  <option [value]="c.code">{{ c.name }}</option>
+                }
+              </optgroup>
+              <optgroup label="All countries">
+                @for (c of otherCountries; track c.code) {
+                  <option [value]="c.code">{{ c.name }}</option>
+                }
+              </optgroup>
+            </select>
+          </div>
+          <div class="field country">
+            <label for="res">Resident in <span class="req" aria-hidden="true">*</span></label>
+            <select id="res" name="res" [(ngModel)]="countryOfResidence">
+              <option value="">Choose a country</option>
+              <optgroup label="Commonly chosen">
+                @for (c of commonCountries; track c.code) {
+                  <option [value]="c.code">{{ c.name }}</option>
+                }
+              </optgroup>
+              <optgroup label="All countries">
+                @for (c of otherCountries; track c.code) {
+                  <option [value]="c.code">{{ c.name }}</option>
+                }
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        @if (nationalityError(); as problem) {
+          <p class="field-error">{{ problem }}</p>
+        } @else if (residenceError(); as problem) {
+          <p class="field-error">{{ problem }}</p>
+        } @else {
+          <p class="hint">
+            With your date of birth, place of birth identifies you when an
+            address will not. Nationality and residence are often different
+            and both matter.
+          </p>
+        }
+      </fieldset>
+    }
+
+    @if (isBusiness()) {
+      <fieldset class="group">
+        <legend>About the company</legend>
+
+        <div class="row">
+          <div class="field grow">
+            <label for="lform">Legal form <span class="req" aria-hidden="true">*</span></label>
+            <select id="lform" name="lform" [(ngModel)]="legalForm">
+              <option value="">Choose a form</option>
+              @for (f of legalForms; track f.value) {
+                <option [value]="f.value">{{ f.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label for="incorp">Incorporated <span class="req" aria-hidden="true">*</span></label>
+            <input id="incorp" name="incorp" type="date"
+                   [(ngModel)]="dateOfIncorporation"
+                   [class.bad]="incorporationError()" />
+            @if (incorporationError(); as problem) {
+              <p class="field-error">{{ problem }}</p>
+            }
+          </div>
+          <div class="field narrow">
+            <label for="nace">NACE code</label>
+            <input id="nace" name="nace" [(ngModel)]="naceCode" maxlength="8"
+                   [class.bad]="naceError()" placeholder="G47.11" />
+            @if (naceError(); as problem) {
+              <p class="field-error">{{ problem }}</p>
+            }
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="group">
+        <legend>Who owns the company</legend>
+        <p class="group-note">
+          An account is opened in a company name, but the risk belongs to the
+          people behind it. Anyone holding {{ disclosureThreshold }}% or more
+          has to be named, along with anyone who controls the company by other
+          means.
+        </p>
+
+        @for (owner of beneficialOwners; track $index) {
+          <div class="owner">
+            <div class="row">
+              <div class="field grow">
+                <label [attr.for]="'own' + $index">Full name</label>
+                <input [id]="'own' + $index" [name]="'own' + $index"
+                       [(ngModel)]="owner.fullName" maxlength="140" />
+              </div>
+              <div class="field narrow-date">
+                <label [attr.for]="'odob' + $index">Date of birth</label>
+                <input [id]="'odob' + $index" [name]="'odob' + $index"
+                       type="date" [(ngModel)]="owner.dateOfBirth" />
+              </div>
+              <div class="field narrow">
+                <label [attr.for]="'oshare' + $index">Share %</label>
+                <input [id]="'oshare' + $index" [name]="'oshare' + $index"
+                       type="number" min="0" max="100" step="0.01"
+                       [(ngModel)]="owner.ownershipPercentage" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field country">
+                <label [attr.for]="'onat' + $index">Nationality</label>
+                <select [id]="'onat' + $index" [name]="'onat' + $index"
+                        [(ngModel)]="owner.nationality">
+                  <option value="">Choose a country</option>
+                  <optgroup label="Commonly chosen">
+                    @for (c of commonCountries; track c.code) {
+                      <option [value]="c.code">{{ c.name }}</option>
+                    }
+                  </optgroup>
+                  <optgroup label="All countries">
+                    @for (c of otherCountries; track c.code) {
+                      <option [value]="c.code">{{ c.name }}</option>
+                    }
+                  </optgroup>
+                </select>
+              </div>
+              <div class="field country">
+                <label [attr.for]="'ores' + $index">Resident in</label>
+                <select [id]="'ores' + $index" [name]="'ores' + $index"
+                        [(ngModel)]="owner.countryOfResidence">
+                  <option value="">Choose a country</option>
+                  <optgroup label="Commonly chosen">
+                    @for (c of commonCountries; track c.code) {
+                      <option [value]="c.code">{{ c.name }}</option>
+                    }
+                  </optgroup>
+                  <optgroup label="All countries">
+                    @for (c of otherCountries; track c.code) {
+                      <option [value]="c.code">{{ c.name }}</option>
+                    }
+                  </optgroup>
+                </select>
+              </div>
+              <label class="check">
+                <input type="checkbox" [name]="'octrl' + $index"
+                       [(ngModel)]="owner.controlsByOtherMeans" />
+                Controls without owning
+              </label>
+              <label class="check">
+                <input type="checkbox" [name]="'opep' + $index"
+                       [(ngModel)]="owner.politicallyExposed" />
+                Politically exposed
+              </label>
+              <button type="button" class="remove" (click)="removeOwner($index)">
+                Remove
+              </button>
+            </div>
+          </div>
+        }
+
+        <div class="owner-actions">
+          <button type="button" class="secondary" (click)="addOwner()">
+            Add an owner
+          </button>
+          @if (beneficialOwners.length) {
+            <span class="tally">
+              {{ declaredOwnership() }}% of the company accounted for
+            </span>
+          }
+        </div>
+
+        @if (ownersError(); as problem) {
+          <p class="field-error">{{ problem }}</p>
+        }
+      </fieldset>
+    }
+
+    <fieldset class="group">
+      <legend>Where the money comes from</legend>
+      <p class="group-note">
+        Recorded so that later activity has something to be compared against.
+      </p>
+
+      <div class="row">
+        <div class="field grow">
+          <label for="sof">Source of funds <span class="req" aria-hidden="true">*</span></label>
+          <select id="sof" name="sof" [(ngModel)]="sourceOfFunds">
+            <option value="">Choose one</option>
+            @for (s of sourcesOfFunds; track s.value) {
+              <option [value]="s.value">{{ s.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="field grow">
+          <label for="sofd">Anything to add</label>
+          <input id="sofd" name="sofd" [(ngModel)]="sourceOfFundsDetail"
+                 maxlength="200" placeholder="Optional" />
+        </div>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" name="pep" [(ngModel)]="politicallyExposed" />
+        I hold, or am close to somebody who holds, public office
+      </label>
+
+      @if (politicallyExposed) {
+        <div class="field">
+          <label for="pepd">Which office, or whose <span class="req" aria-hidden="true">*</span></label>
+          <input id="pepd" name="pepd" [(ngModel)]="pepDetails" maxlength="200" />
+          <p class="hint">
+            Not a judgement. It sets the level of scrutiny payments receive.
+          </p>
+        </div>
+      }
+    </fieldset>
 
     <div class="actions">
       <button type="submit" [disabled]="!canSubmit() || saving()">

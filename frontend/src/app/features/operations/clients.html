@@ -127,19 +127,146 @@
             <span class="pill" [class]="statusTone(c.status)">{{ c.status }}</span>
             <span class="email">{{ c.email }}</span>
 
-            @if (isPending(c)) {
-              <button type="button" class="approve" (click)="activate(c)"
-                      [disabled]="busy()">
-                Approve client
+            <div class="head-actions">
+              @if (isPending(c)) {
+                <button type="button" class="approve" (click)="activate(c)"
+                        [disabled]="busy()">
+                  Approve client
+                </button>
+              }
+
+              <button type="button" class="details-toggle"
+                      (click)="toggleDetails(c.id)">
+                @if (showsDetails(c)) { Hide details } @else { Show details }
               </button>
-            }
+            </div>
           </div>
 
           @if (isPending(c)) {
             <p class="pending-note">
-              Identity not yet checked. No account can be opened until this
-              client is approved.
+              Nobody has checked this identity yet. Read what is below against
+              the document in front of you before approving.
             </p>
+          }
+
+          <!--
+            The record the approval is a judgement about. Open by default while
+            a client is pending, because that is the one moment somebody has to
+            read it -- and a panel that has to be found is a panel that gets
+            skipped.
+          -->
+          @if (showsDetails(c)) {
+            <div class="kyc">
+
+              @if (flags(c).length) {
+                <div class="flags">
+                  <span class="flags-label">Worth a second look</span>
+                  <ul>
+                    @for (f of flags(c); track f) { <li>{{ f }}</li> }
+                  </ul>
+                </div>
+              }
+
+              <dl class="facts">
+                @if (c.clientType === 'INDIVIDUAL') {
+                  <div>
+                    <dt>Born</dt>
+                    <dd>
+                      {{ c.dateOfBirth ?? 'Not recorded' }}
+                      @if (c.placeOfBirth) {
+                        in {{ c.placeOfBirth }}@if (c.countryOfBirth) {, {{ c.countryOfBirth }}}
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Identity document</dt>
+                    <dd [class.bad]="documentWarning(c)">
+                      {{ documentSummary(c) }}
+                      @if (c.identityDocumentExpiry) {
+                        <span class="quiet">
+                          &middot; expires {{ c.identityDocumentExpiry }}
+                        </span>
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Nationality</dt>
+                    <dd>
+                      {{ c.nationality ?? 'Not recorded' }}
+                      @if (c.countryOfResidence) {
+                        <span class="quiet">
+                          &middot; resident in {{ c.countryOfResidence }}
+                        </span>
+                      }
+                    </dd>
+                  </div>
+                } @else {
+                  <div>
+                    <dt>Registered</dt>
+                    <dd>
+                      {{ c.registrationNumber ?? 'Not recorded' }}
+                      @if (c.dateOfIncorporation) {
+                        <span class="quiet">
+                          &middot; incorporated {{ c.dateOfIncorporation }}
+                        </span>
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Legal form</dt>
+                    <dd>{{ c.legalForm ?? 'Not recorded' }}</dd>
+                  </div>
+                  <div>
+                    <dt>Sector</dt>
+                    <dd>
+                      {{ c.naceCode ?? c.industry ?? 'Not recorded' }}
+                    </dd>
+                  </div>
+                }
+
+                <div>
+                  <dt>Address</dt>
+                  <dd>{{ address(c) || 'Not recorded' }}</dd>
+                </div>
+                <div>
+                  <dt>Contact</dt>
+                  <dd>
+                    {{ c.email }}
+                    @if (c.phone) { <span class="quiet">&middot; {{ c.phone }}</span> }
+                  </dd>
+                </div>
+                <div>
+                  <dt>Source of funds</dt>
+                  <dd>{{ sourceOfFunds(c) }}</dd>
+                </div>
+              </dl>
+
+              @if (c.beneficialOwners?.length) {
+                <div class="owners">
+                  <span class="owners-label">Who owns the company</span>
+                  <ul>
+                    @for (o of c.beneficialOwners; track o.id) {
+                      <li>
+                        <strong>{{ o.fullName }}</strong>
+                        <span class="quiet">born {{ o.dateOfBirth }}</span>
+                        @if (o.nationality) {
+                          <span class="quiet">{{ o.nationality }}</span>
+                        }
+                        <span class="share">
+                          {{ o.ownershipPercentage }}%
+                        </span>
+                        @if (o.controlsByOtherMeans) {
+                          <span class="chip quiet">controls without owning</span>
+                        }
+                        @if (o.politicallyExposed) {
+                          <span class="chip warn">politically exposed</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            </div>
           }
 
           @if (accountsOf(c.id).length === 0) {
