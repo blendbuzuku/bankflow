@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../core/services/auth';
 import { Toasts } from '../../core/services/toasts';
+import { WorkQueues } from '../../core/services/work-queues';
 import {
   TransactionResponse,
   TransactionService,
@@ -29,6 +30,7 @@ export class ApprovalQueue implements OnInit {
   private readonly transactionService = inject(TransactionService);
   private readonly authService = inject(AuthService);
   private readonly toasts = inject(Toasts);
+  private readonly queues = inject(WorkQueues);
 
   readonly pending = signal<TransactionResponse[]>([]);
   readonly loading = signal(true);
@@ -87,6 +89,13 @@ export class ApprovalQueue implements OnInit {
           `${released.transactionReference} released and now ${released.status}.`,
         );
         this.load();
+
+        /*
+         * The badge counts this queue, and acting on it does not
+         * navigate -- so without this the shell keeps claiming the
+         * item is still waiting until the page is reloaded.
+         */
+        this.queues.refresh();
       },
       error: error => {
         this.busy.set(null);
@@ -123,6 +132,13 @@ export class ApprovalQueue implements OnInit {
             `${declined.transactionReference}. No money moved.`,
           );
           this.load();
+
+        /*
+         * The badge counts this queue, and acting on it does not
+         * navigate -- so without this the shell keeps claiming the
+         * item is still waiting until the page is reloaded.
+         */
+        this.queues.refresh();
         },
         error: error => {
           this.busy.set(null);

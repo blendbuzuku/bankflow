@@ -186,6 +186,20 @@ button.link {
   margin-top: 2px;
 }
 
+/*
+ * Sits under the whole row rather than in one cell, because it explains the
+ * gap between two figures and belongs to neither.
+ */
+.round-trip {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #b45309;
+  max-width: 72ch;
+}
+
 .totals dd.in { color: #15803d; }
 .totals dd.out { color: #b91c1c; }
 .totals dd.strong { font-size: 21px; font-weight: 700; }

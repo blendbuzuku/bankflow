@@ -74,6 +74,15 @@ export class Banks implements OnInit, HasUnsavedChanges {
     return bic.length >= 6 ? bic.substring(4, 6) : '';
   }
 
+  /**
+   * Back to how the form loads, and only after the bank was actually added.
+   * A rejected BIC keeps what was typed, because that is what needs fixing.
+   */
+  private resetAddForm(): void {
+    this.newBic = '';
+    this.newName = '';
+  }
+
   canAdd(): boolean {
     return /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(
       this.newBic.trim().toUpperCase(),
@@ -89,8 +98,7 @@ export class Banks implements OnInit, HasUnsavedChanges {
     this.directory.add(bic, this.newName.trim(), this.countryOf(bic)).subscribe({
       next: bank => {
         this.busy.set(false);
-        this.newBic = '';
-        this.newName = '';
+        this.resetAddForm();
         this.toasts.success(
           'Bank added',
           `${bank.label} can now be chosen on a payment.`,

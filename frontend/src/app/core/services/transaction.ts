@@ -91,6 +91,8 @@ export interface TransferRequest {
   creditorName?: string | null;
   creditorIban?: string | null;
   creditorAgentBic?: string | null;
+  /** ISO 3166-1 alpha-2. Written into the beneficiary's PstlAdr. */
+  creditorCountry?: string | null;
 }
 
 export interface TransactionResponse {
@@ -177,7 +179,87 @@ export interface StatementResponse {
   totalDebits: number;
   creditCount: number;
   debitCount: number;
+  /**
+   * The same period with round trips taken off both sides.
+   *
+   * totalCredits and totalDebits are gross turnover, which is what camt.053
+   * carries and what the entry list shows. This is what a customer means by
+   * paid in and paid out.
+   */
+  netted: {
+    paidIn: number;
+    paidOut: number;
+    paidInCount: number;
+    paidOutCount: number;
+    reversed: number;
+  };
   entries: StatementEntry[];
+}
+
+/**
+ * A payment the scheme still has something to say about.
+ *
+ * Described from the counterparty's side — whose account the money is going
+ * to, and which bank holds it — because that is who is being played.
+ */
+export interface SchemeAction {
+  transactionReference: string;
+  endToEndId: string | null;
+  amount: number;
+  currency: string;
+  rail: string;
+  creditorName: string | null;
+  creditorIban: string | null;
+  creditorAgentBic: string | null;
+  sentAt: string;
+  recallId: string | null;
+  recallReason: string | null;
+}
+
+export interface SchemeQueue {
+  awaitingStatus: SchemeAction[];
+  returnable: SchemeAction[];
+}
+
+/**
+ * One line of the tariff.
+ *
+ * A charge is a fixed amount, a percentage of the payment, or both, optionally
+ * floored and capped -- which is how banks actually price: flat on retail
+ * clearing, a percentage on high value with a cap so a large payment does not
+ * attract an absurd charge.
+ */
+export interface TariffRule {
+  id: number;
+  ruleCode: string;
+  description: string;
+  paymentType: string;
+  paymentTypeName: string;
+  currency: string;
+  minAmount: number;
+  maxAmount: number | null;
+  fixedFee: number;
+  percentageRate: number;
+  minFee: number | null;
+  maxFee: number | null;
+  active: boolean;
+  validFrom: string;
+  validTo: string | null;
+}
+
+export interface TariffRuleRequest {
+  ruleCode: string;
+  description: string;
+  paymentType: string;
+  currency: string;
+  minAmount: number;
+  maxAmount?: number | null;
+  fixedFee?: number;
+  percentageRate?: number;
+  minFee?: number | null;
+  maxFee?: number | null;
+  validFrom?: string | null;
+  validTo?: string | null;
 }
 
 /** One scheme message in the traffic log, without its body. */
@@ -325,10 +407,19 @@ export interface AuditEvent {
   id: number;
   eventType: string;
   transactionReference: string | null;
+  entityType: string | null;
+  entityId: string | null;
   actorUsername: string | null;
   actorRole: string | null;
   summary: string;
   details: string | null;
+  /**
+   * Whether this is money moving, or a decision about money.
+   *
+   * Derived from the event type on the server, never set by a caller, so a
+   * settlement cannot be recorded as having moved nothing.
+   */
+  financial: boolean;
   occurredAt: string;
 }
 
@@ -384,6 +475,22 @@ export class TransactionService {
   getByReference(reference: string): Observable<TransactionResponse> {
     return this.http.get<TransactionResponse>(
       `/api/transactions/reference/${reference}`,
+    );
+  }
+
+  /**
+   * The trail for something that is not a payment.
+   *
+   * A client or an account carries no transaction reference, so the
+   * per-payment call below cannot reach these. This is where "who approved
+   * this client, and when" gets answered.
+   */
+  entityAuditTrail(
+    entityType: string,
+    entityId: string | number,
+  ): Observable<AuditEvent[]> {
+    return this.http.get<AuditEvent[]>(
+      `/api/transactions/audit/${entityType}/${entityId}`,
     );
   }
 
@@ -582,13 +689,32 @@ export class TransactionService {
   }
 
   /** Simulates the beneficiary bank sending a settled payment back. */
-  simulateReturn(reference: string, reasonCode: string): Observable<string> {
+  simulateReturn(
+    reference: string,
+    reasonCode: string,
+    returnedAmount?: string,
+  ): Observable<string> {
+    const amount = returnedAmount
+      ? `&returnedAmount=${encodeURIComponent(returnedAmount)}` : '';
     return this.http.post(
       `/api/kips/simulate/return/${encodeURIComponent(reference)}`
-        + `?reason=${encodeURIComponent(reasonCode)}`,
+        + `?reason=${encodeURIComponent(reasonCode)}${amount}`,
       null,
       { responseType: 'text' },
     );
+  }
+
+  /** What the scheme still owes an answer on, from its side. */
+  schemeQueue(): Observable<SchemeQueue> {
+    return this.http.get<SchemeQueue>('/api/kips/queue');
+  }
+
+  /** Delivers a message to us as though the scheme had sent it. */
+  deliverInbound(xml: string): Observable<string> {
+    return this.http.post('/api/kips/inbound', xml, {
+      headers: { 'Content-Type': 'application/xml' },
+      responseType: 'text',
+    });
   }
 
   awaitingApproval(): Observable<TransactionResponse[]> {
@@ -607,5 +733,32 @@ export class TransactionService {
       `/api/approvals/${reference}/decline?reason=${encodeURIComponent(reason)}`,
       {},
     );
+  }
+
+  // --- tariff ------------------------------------------------------------
+
+  /** Every line, current and retired: a retired one explains an old charge. */
+  tariff(): Observable<TariffRule[]> {
+    return this.http.get<TariffRule[]>('/api/tariff');
+  }
+
+  addTariffRule(request: TariffRuleRequest): Observable<TariffRule> {
+    return this.http.post<TariffRule>('/api/tariff', request);
+  }
+
+  /** Supersedes a line from a date rather than rewriting what it charged. */
+  amendTariffRule(
+    id: number,
+    request: TariffRuleRequest,
+  ): Observable<TariffRule> {
+    return this.http.put<TariffRule>(`/api/tariff/${id}`, request);
+  }
+
+  retireTariffRule(id: number): Observable<TariffRule> {
+    return this.http.post<TariffRule>(`/api/tariff/${id}/retire`, null);
+  }
+
+  reinstateTariffRule(id: number): Observable<TariffRule> {
+    return this.http.post<TariffRule>(`/api/tariff/${id}/reinstate`, null);
   }
 }

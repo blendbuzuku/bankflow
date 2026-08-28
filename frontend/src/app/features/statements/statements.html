@@ -60,18 +60,30 @@
           <dt>Opening</dt>
           <dd class="num">{{ s.openingBalance | number: '1.2-2' }} {{ s.currency }}</dd>
         </div>
+        <!--
+          Netted, not gross. The card exists to be checked by adding it up,
+          and a payment that went out and came straight back inflates both
+          sides by the same amount while changing nothing -- so the customer
+          reads figures they cannot reconcile against what they know.
+        -->
         <div>
           <dt>Paid in</dt>
           <dd class="num in">
-            {{ s.totalCredits | number: '1.2-2' }}
-            <small>{{ s.creditCount }} {{ s.creditCount === 1 ? 'entry' : 'entries' }}</small>
+            {{ s.netted.paidIn | number: '1.2-2' }}
+            <small>
+              {{ s.netted.paidInCount }}
+              {{ s.netted.paidInCount === 1 ? 'entry' : 'entries' }}
+            </small>
           </dd>
         </div>
         <div>
           <dt>Paid out</dt>
           <dd class="num out">
-            {{ s.totalDebits | number: '1.2-2' }}
-            <small>{{ s.debitCount }} {{ s.debitCount === 1 ? 'entry' : 'entries' }}</small>
+            {{ s.netted.paidOut | number: '1.2-2' }}
+            <small>
+              {{ s.netted.paidOutCount }}
+              {{ s.netted.paidOutCount === 1 ? 'entry' : 'entries' }}
+            </small>
           </dd>
         </div>
         <div>
@@ -79,6 +91,14 @@
           <dd class="num strong">{{ s.closingBalance | number: '1.2-2' }} {{ s.currency }}</dd>
         </div>
       </dl>
+
+      @if (s.netted.reversed > 0) {
+        <p class="round-trip">
+          {{ s.netted.reversed | number: '1.2-2' }} {{ s.currency }} left this
+          account and came back within the period. Both halves are listed below
+          and cancel each other out, so they are not counted above.
+        </p>
+      }
     </section>
 
     <section class="card">

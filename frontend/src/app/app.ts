@@ -9,10 +9,10 @@ import {
 import { filter } from 'rxjs/operators';
 
 import { AuthService, UserResponse } from './core/services/auth';
+import { WorkQueues } from './core/services/work-queues';
 import { ToastStack } from './shared/toast-stack';
 import { Breadcrumbs } from './shared/breadcrumbs';
 import { ConfirmDialog } from './shared/confirm-dialog';
-import { TransactionService } from './core/services/transaction';
 
 /**
  * The application shell.
@@ -31,12 +31,20 @@ import { TransactionService } from './core/services/transaction';
 export class App {
 
   private readonly authService = inject(AuthService);
-  private readonly transactionService = inject(TransactionService);
   private readonly router = inject(Router);
 
   readonly user = signal<UserResponse | null>(null);
-  readonly pendingCount = signal(0);
-  readonly recallCount = signal(0);
+
+  /*
+   * The counts live in a service rather than here, so a screen that empties a
+   * queue can say so. Navigating is not the only way a queue changes -- and
+   * it was the only thing that used to update these.
+   */
+  private readonly queues = inject(WorkQueues);
+
+  readonly pendingCount = this.queues.approvals;
+  readonly recallCount = this.queues.recalls;
+  readonly schemeCount = this.queues.scheme;
 
   /**
    * Which menu is open, by name.
@@ -79,7 +87,7 @@ export class App {
       this.authService.loadCurrentUser().subscribe({
         next: user => {
           this.user.set(user);
-          this.refreshPendingCount();
+          this.queues.refresh();
         },
         error: () => this.user.set(null),
       });
@@ -88,31 +96,9 @@ export class App {
     }
 
     this.user.set(this.authService.currentUser());
-    this.refreshPendingCount();
+    this.queues.refresh();
   }
 
-  /**
-   * The badge is a prompt, not a control. A failure to read it should not
-   * interrupt whatever the user is actually doing.
-   */
-  private refreshPendingCount(): void {
-
-    if (!this.isStaff()) {
-      this.pendingCount.set(0);
-      this.recallCount.set(0);
-      return;
-    }
-
-    this.transactionService.awaitingApproval().subscribe({
-      next: pending => this.pendingCount.set(pending.length),
-      error: () => this.pendingCount.set(0),
-    });
-
-    this.transactionService.openRecalls().subscribe({
-      next: recalls => this.recallCount.set(recalls.length),
-      error: () => this.recallCount.set(0),
-    });
-  }
 
   isStaff(): boolean {
     return this.authService.isStaff();

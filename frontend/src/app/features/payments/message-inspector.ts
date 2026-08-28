@@ -32,9 +32,19 @@ import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 })
 export class MessageInspector implements OnInit, HasUnsavedChanges {
 
-  /** Pasted XML is typed-in work; a chosen message is not. */
+  /**
+   * Pasted XML is typed-in work; a chosen message is not.
+   *
+   * Once it has been read, it is no longer unsaved: what is in the box is
+   * what is on the screen, and reading it was the whole operation. The
+   * textarea keeps its contents so the reading still has its source beside
+   * it -- clearing it on success would make the input look like it vanished.
+   */
   hasUnsavedChanges(): boolean {
-    return this.pasteMode() && !!this.pasted.trim();
+
+    const typed = this.pasted.trim();
+
+    return this.pasteMode() && !!typed && typed !== this.xml().trim();
   }
 
 

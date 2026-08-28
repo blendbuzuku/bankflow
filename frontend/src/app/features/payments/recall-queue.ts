@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../core/services/auth';
 import { Toasts } from '../../core/services/toasts';
+import { WorkQueues } from '../../core/services/work-queues';
 import {
   RecallResponse,
   TransactionService,
@@ -29,6 +30,7 @@ export class RecallQueue implements OnInit {
   private readonly transactionService = inject(TransactionService);
   private readonly authService = inject(AuthService);
   private readonly toasts = inject(Toasts);
+  private readonly queues = inject(WorkQueues);
 
   readonly recalls = signal<RecallResponse[]>([]);
   readonly loading = signal(true);
@@ -95,6 +97,13 @@ export class RecallQueue implements OnInit {
           `${recall.transactionReference} was returned to the sending bank.`,
         );
         this.load();
+
+        /*
+         * The badge counts this queue, and acting on it does not
+         * navigate -- so without this the shell keeps claiming the
+         * item is still waiting until the page is reloaded.
+         */
+        this.queues.refresh();
       },
       error: error => {
         this.busy.set(null);
@@ -118,6 +127,13 @@ export class RecallQueue implements OnInit {
           `${recall.transactionReference} stands. No funds moved.`,
         );
         this.load();
+
+        /*
+         * The badge counts this queue, and acting on it does not
+         * navigate -- so without this the shell keeps claiming the
+         * item is still waiting until the page is reloaded.
+         */
+        this.queues.refresh();
       },
       error: error => {
         this.busy.set(null);
