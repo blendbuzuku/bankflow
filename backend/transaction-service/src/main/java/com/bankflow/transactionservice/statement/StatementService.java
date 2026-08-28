@@ -14,7 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Comparator;
 import java.util.List;
 
@@ -103,6 +107,17 @@ public class StatementService {
         int creditCount = 0;
         int debitCount = 0;
 
+        /*
+         * Debits that have not yet been cancelled, oldest first, per payment.
+         * A reversal eats into its own payment's debits and nobody else's, so
+         * two payments of the same amount cannot pay each other off.
+         */
+        Map<String, Deque<BigDecimal>> uncancelled = new LinkedHashMap<>();
+
+        BigDecimal reversed = BigDecimal.ZERO;
+        BigDecimal arrived = BigDecimal.ZERO;
+        int arrivedCount = 0;
+
         for (LedgerEntry entry : inPeriod) {
 
             boolean credit = entry.getEntryType() == LedgerEntryType.CREDIT;
@@ -114,9 +129,30 @@ public class StatementService {
             if (credit) {
                 credits = credits.add(entry.getAmount());
                 creditCount++;
+
+                /*
+                 * Whatever a reversal cannot cancel is money that genuinely
+                 * arrived -- the payment it undoes was made before this
+                 * statement began, so this period really is better off by it.
+                 */
+                BigDecimal cancelled = isReversal(entry)
+                        ? cancel(uncancelled, entry)
+                        : BigDecimal.ZERO;
+
+                reversed = reversed.add(cancelled);
+
+                BigDecimal net = entry.getAmount().subtract(cancelled);
+
+                if (net.signum() > 0) {
+                    arrived = arrived.add(net);
+                    arrivedCount++;
+                }
+
             } else {
                 debits = debits.add(entry.getAmount());
                 debitCount++;
+
+                remember(uncancelled, entry);
             }
 
             lines.add(new Statement.StatementEntry(
@@ -148,8 +184,125 @@ public class StatementService {
                 debits,
                 creditCount,
                 debitCount,
+                netted(uncancelled, arrived, arrivedCount, reversed),
                 lines
         );
+    }
+
+    /** Files a debit as something a later reversal could cancel. */
+    private void remember(
+            Map<String, Deque<BigDecimal>> uncancelled, LedgerEntry entry) {
+
+        String key = keyOf(entry);
+
+        if (key == null) {
+            return;
+        }
+
+        uncancelled
+                .computeIfAbsent(key, ignored -> new ArrayDeque<>())
+                .addLast(entry.getAmount());
+    }
+
+    /**
+     * Cancels as much of this payment's outstanding debits as the credit covers.
+     *
+     * Oldest first, and only within the same payment. Returns what was actually
+     * cancelled, which is less than the credit when the debit being undone
+     * happened before this statement started.
+     */
+    private BigDecimal cancel(
+            Map<String, Deque<BigDecimal>> uncancelled, LedgerEntry entry) {
+
+        String key = keyOf(entry);
+
+        if (key == null) {
+            return BigDecimal.ZERO;
+        }
+
+        Deque<BigDecimal> debits = uncancelled.get(key);
+
+        if (debits == null) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal remaining = entry.getAmount();
+        BigDecimal cancelled = BigDecimal.ZERO;
+
+        while (remaining.signum() > 0 && !debits.isEmpty()) {
+
+            BigDecimal debit = debits.removeFirst();
+            BigDecimal taken = debit.min(remaining);
+
+            cancelled = cancelled.add(taken);
+            remaining = remaining.subtract(taken);
+
+            // A partial return leaves the rest of that debit standing.
+            if (debit.compareTo(taken) > 0) {
+                debits.addFirst(debit.subtract(taken));
+            }
+        }
+
+        return cancelled;
+    }
+
+    /**
+     * What is left once the round trips are taken off both sides.
+     *
+     * Paid out is whatever debit never got cancelled -- on a returned payment
+     * that is the charge alone, which is exactly what the customer is out of
+     * pocket and exactly what the closing balance reflects.
+     */
+    private Statement.Netted netted(
+            Map<String, Deque<BigDecimal>> uncancelled,
+            BigDecimal arrived,
+            int arrivedCount,
+            BigDecimal reversed) {
+
+        BigDecimal paidOut = BigDecimal.ZERO;
+        int paidOutCount = 0;
+
+        for (Deque<BigDecimal> debits : uncancelled.values()) {
+            for (BigDecimal debit : debits) {
+
+                if (debit.signum() > 0) {
+                    paidOut = paidOut.add(debit);
+                    paidOutCount++;
+                }
+            }
+        }
+
+        return new Statement.Netted(
+                arrived, paidOut, arrivedCount, paidOutCount, reversed
+        );
+    }
+
+    /**
+     * Which payment a leg belongs to.
+     *
+     * The transaction reference, because every leg of one payment shares it --
+     * the original debit, its charge, and whatever comes back.
+     */
+    private String keyOf(LedgerEntry entry) {
+
+        Transaction transaction = entry.getTransaction();
+
+        return transaction == null ? null : transaction.getTransactionReference();
+    }
+
+    /**
+     * Whether this leg is putting back money an earlier leg took out.
+     *
+     * Both spellings appear because the two paths are different events: a
+     * rejection never left the country and unwinds under -RETURN-, while a
+     * return travelled and came back as its own payment under -RTR-.
+     */
+    private boolean isReversal(LedgerEntry entry) {
+
+        String operation = entry.getOperationId();
+
+        return operation != null
+                && (operation.contains("-RTR-") || operation.contains("-RETURN-"));
     }
 
     /** Undoes one entry's effect on a balance. */
@@ -202,6 +355,27 @@ public class StatementService {
 
         if (operation != null && operation.contains("-RTR-")) {
             return credit ? "Payment returned to you" : "Payment returned";
+        }
+
+        /*
+         * The charge rides on the same transaction as the payment that caused
+         * it, so the transaction type cannot tell them apart. The leg's own
+         * operation id can, and the customer needs it named: an unexplained
+         * difference between what they sent and what left their account is
+         * exactly the question a statement should answer.
+         */
+        if (operation != null && operation.contains("-FEE")) {
+            return credit ? "Charge refunded" : "Charge";
+        }
+
+        /*
+         * A rejection unwinds a payment that never left, so the credit carries
+         * the original payment's parties -- and on an outbound payment the
+         * debtor is the account holder. Left to the counterparty branch below,
+         * this line would tell customers they had been paid by themselves.
+         */
+        if (operation != null && operation.contains("-RETURN-")) {
+            return credit ? "Payment rejected, refunded to you" : "Payment returned";
         }
 
         String counterparty = credit

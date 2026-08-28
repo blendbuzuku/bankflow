@@ -1,8 +1,12 @@
 package com.bankflow.transactionservice.service;
 
 import com.bankflow.common.exception.BusinessException;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.entity.*;
 import com.bankflow.transactionservice.pacs.*;
+import com.bankflow.transactionservice.recall.RecallDirection;
+import com.bankflow.transactionservice.recall.RecallRequestRepository;
+import com.bankflow.transactionservice.recall.RecallStatus;
 import com.bankflow.transactionservice.repository.TransactionRepository;
 import com.bankflow.transactionservice.security.AuthenticatedUser;
 import com.bankflow.transactionservice.security.SecurityUtils;
@@ -10,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -37,6 +42,7 @@ public class PaymentReturnService {
     private final PacsMessageRepository messageRepository;
     private final MessageIdGenerator messageIdGenerator;
     private final AuditService auditService;
+    private final RecallRequestRepository recallRepository;
 
     public PaymentReturnService(
             TransactionRepository transactionRepository,
@@ -46,8 +52,10 @@ public class PaymentReturnService {
             PacsSchemaValidator validator,
             PacsMessageRepository messageRepository,
             MessageIdGenerator messageIdGenerator,
-            AuditService auditService) {
+            AuditService auditService,
+            RecallRequestRepository recallRepository) {
 
+        this.recallRepository = recallRepository;
         this.transactionRepository = transactionRepository;
         this.ledgerPoster = ledgerPoster;
         this.suspenseAccounts = suspenseAccounts;
@@ -150,6 +158,8 @@ public class PaymentReturnService {
                         .formatted(returned, currency),
                 details
         );
+
+        closeRecallAnsweredBy(reference, returned, currency);
 
         return saved;
     }
@@ -272,6 +282,47 @@ public class PaymentReturnService {
         );
 
         return saved;
+    }
+
+    /**
+     * A return is the answer to a recall we asked for.
+     *
+     * The counterparty does not tell us twice: money coming back with a
+     * pacs.004 is them agreeing, and there is no separate acceptance message
+     * to wait for. Leaving the request open afterwards would show a recall
+     * still awaiting a reply that has already arrived — and offer to chase an
+     * answer we are holding.
+     */
+    private void closeRecallAnsweredBy(
+            String reference, BigDecimal returned, Currency currency) {
+
+        recallRepository
+                .findByTransactionReferenceAndStatus(reference, RecallStatus.REQUESTED)
+                .filter(recall -> recall.getDirection() == RecallDirection.OUTBOUND)
+                .ifPresent(recall -> {
+
+                    recall.setStatus(RecallStatus.ACCEPTED);
+                    recall.setDecidedAt(LocalDateTime.now());
+                    recall.setDecisionNote(
+                            "Answered by a payment return of %s %s".formatted(
+                                    returned, currency));
+
+                    recallRepository.save(recall);
+
+                    auditService.record(
+                            AuditEventType.RECALL_ACCEPTED,
+                            reference,
+                            "RecallRequest",
+                            recall.getCancellationId(),
+                            ("The beneficiary bank agreed to our recall and "
+                                    + "returned %s %s").formatted(returned, currency),
+                            Map.of(
+                                    "cancellationId", recall.getCancellationId(),
+                                    "answeredBy", "pacs.004",
+                                    "amountReturned", returned
+                            )
+                    );
+                });
     }
 
     /**

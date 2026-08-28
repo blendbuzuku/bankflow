@@ -40,7 +40,42 @@ public record Statement(
         int creditCount,
         int debitCount,
 
+        /**
+         * The same period with money that came straight back taken out.
+         *
+         * totalCredits and totalDebits above are gross turnover, which is what
+         * camt.053 requires and what the entry list shows. They are not what a
+         * customer means by "paid in": somebody who deposited thirty thousand
+         * and had two payments bounce reads forty thousand, and no arithmetic
+         * they can do on the card recovers the figure they know is true.
+         */
+        Netted netted,
+
         List<StatementEntry> entries) {
+
+    /**
+     * Turnover with round trips removed from both sides.
+     *
+     * A reversal cancels an equal debit, so taking it off both totals leaves
+     * opening + paidIn - paidOut = closing exactly as before -- the customer
+     * can still check the card by adding it up, and now the figures are ones
+     * they recognise.
+     *
+     * Only reversals whose original debit falls inside the same period are
+     * netted. A payment sent in August and returned in September genuinely is
+     * money arriving in September, and September's statement should say so.
+     */
+    public record Netted(
+
+            BigDecimal paidIn,
+            BigDecimal paidOut,
+
+            int paidInCount,
+            int paidOutCount,
+
+            /** How much went out and came back without leaving a trace. */
+            BigDecimal reversed) {
+    }
 
     /** One movement, as the customer sees it. */
     public record StatementEntry(

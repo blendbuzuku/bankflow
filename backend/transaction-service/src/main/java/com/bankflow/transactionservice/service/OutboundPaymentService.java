@@ -5,6 +5,7 @@ import com.bankflow.common.exception.BusinessException;
 import com.bankflow.transactionservice.client.AccountClient;
 import com.bankflow.transactionservice.dto.AccountResponse;
 import com.bankflow.transactionservice.dto.TransferRequest;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.entity.*;
 import com.bankflow.transactionservice.pacs.*;
 import com.bankflow.transactionservice.repository.LedgerEntryRepository;
@@ -56,6 +57,7 @@ public class OutboundPaymentService {
     private final MessageIdGenerator messageIdGenerator;
     private final ApprovalService approvalService;
     private final FundsCheck fundsCheck;
+    private final PaymentFieldValidator fieldValidator;
 
     public OutboundPaymentService(
             TransactionRepository transactionRepository,
@@ -69,7 +71,11 @@ public class OutboundPaymentService {
             MessageIdGenerator messageIdGenerator,
             ApprovalService approvalService,
             FundsCheck fundsCheck,
-            BusinessCalendar businessCalendar) {
+            BusinessCalendar businessCalendar,
+            PaymentFieldValidator fieldValidator
+) {
+
+        this.fieldValidator = fieldValidator;
 
         this.approvalService = approvalService;
         this.fundsCheck = fundsCheck;
@@ -276,23 +282,21 @@ public class OutboundPaymentService {
             );
         }
 
-        if (isBlank(request.getCreditorIban())) {
-            throw new BusinessException(
-                    "Creditor IBAN is required for an outbound payment"
-            );
-        }
-
         if (isBlank(request.getCreditorName())) {
             throw new BusinessException(
                     "Creditor name is required: the scheme mandates Cdtr/Nm"
             );
         }
 
-        if (isBlank(request.getCreditorAgentBic())) {
-            throw new BusinessException(
-                    "Creditor agent BIC is required to route the payment"
-            );
-        }
+        /*
+         * The customer self-service route reaches here too, so this is the
+         * check that stops a beneficiary IBAN nobody at the counter ever saw.
+         */
+        fieldValidator.validate(
+                request,
+                request.getPaymentType(),
+                true
+        );
     }
 
     private Transaction createTransaction(
@@ -324,6 +328,17 @@ public class OutboundPaymentService {
         transaction.setDebtorIban(debtor.iban());
 
         /*
+         * Taken from the account holder, not the request. The payer's address
+         * is a fact about them rather than something an instruction gets to
+         * assert, and it is what goes into the message's PstlAdr.
+         */
+        transaction.setDebtorAddressLine1(debtor.clientAddressLine1());
+        transaction.setDebtorAddressLine2(debtor.clientAddressLine2());
+        transaction.setDebtorCity(debtor.clientCity());
+        transaction.setDebtorPostalCode(debtor.clientPostalCode());
+        transaction.setDebtorCountry(debtor.clientCountry());
+
+        /*
          * The scheme requires a debtor name and it must be the account holder's,
          * not whatever the form happened to carry. Falling back to the IBAN
          * would put an account number where a person's name belongs.
@@ -339,6 +354,8 @@ public class OutboundPaymentService {
         transaction.setCreditorName(request.getCreditorName());
         transaction.setCreditorIban(request.getCreditorIban());
         transaction.setCreditorAgentBic(request.getCreditorAgentBic());
+        transaction.setCreditorCountry(
+                normaliseCountry(request.getCreditorCountry()));
 
         transaction.setFeeAmount(fee.totalFee());
         transaction.setDebtorFeeAmount(fee.debtorFee());
@@ -378,12 +395,19 @@ public class OutboundPaymentService {
         BigDecimal amount = transaction.getAmount();
         Currency currency = transaction.getCurrency();
 
-        BigDecimal totalDebit = fee.totalDebitFor(amount);
-
+        /*
+         * The payment and the charge are booked separately against the debtor.
+         *
+         * One combined debit of amount-plus-fee balances just as well, but it
+         * leaves the customer a figure they cannot explain: their statement
+         * shows 200.50 leaving for a payment of 200.00, and the difference
+         * exists only on the bank's income account where they cannot see it.
+         * A charge is a real movement and earns its own line.
+         */
         ledgerPoster.debit(
                 transaction,
                 transaction.getSourceAccountId(),
-                totalDebit,
+                amount,
                 reference + "-DEBIT"
         );
 
@@ -395,6 +419,13 @@ public class OutboundPaymentService {
         );
 
         if (fee.debtorFee().compareTo(BigDecimal.ZERO) > 0) {
+
+            ledgerPoster.debit(
+                    transaction,
+                    transaction.getSourceAccountId(),
+                    fee.debtorFee(),
+                    reference + "-FEE-DEBIT"
+            );
 
             ledgerPoster.credit(
                     transaction,
@@ -420,29 +451,26 @@ public class OutboundPaymentService {
 
         Map<String, Object> posting = new LinkedHashMap<>();
 
-        posting.put("debtorDebited", totalDebit);
+        posting.put("debtorDebitedForPayment", amount);
+        posting.put("debtorDebitedForCharge", fee.debtorFee());
         posting.put("suspenseCredited", amount);
         posting.put("incomeCredited", fee.debtorFee());
         posting.put("currency", currency.name());
-
-        posting.put(
-                "net",
-                totalDebit.subtract(amount).subtract(fee.debtorFee())
-        );
+        posting.put("net", BigDecimal.ZERO);
 
         auditService.record(
                 AuditEventType.LEDGER_ENTRY_POSTED,
                 reference,
                 "LedgerEntry",
                 reference,
-                "Outbound legs posted: DR %s / CR suspense %s + income %s, net %s"
-                        .formatted(
-                                totalDebit,
-                                amount,
-                                fee.debtorFee(),
-                                totalDebit.subtract(amount)
-                                        .subtract(fee.debtorFee())
-                        ),
+                ("Outbound legs posted: DR debtor %s + charge %s / CR suspense %s "
+                        + "+ income %s, net %s").formatted(
+                        amount,
+                        fee.debtorFee(),
+                        amount,
+                        fee.debtorFee(),
+                        BigDecimal.ZERO
+                ),
                 posting
         );
     }
@@ -466,5 +494,11 @@ public class OutboundPaymentService {
         }
 
         return null;
+    }
+
+    /** Stored upper-case, because it is compared and written into the message. */
+    private String normaliseCountry(String country) {
+        return country == null || country.isBlank()
+                ? null : country.trim().toUpperCase();
     }
 }

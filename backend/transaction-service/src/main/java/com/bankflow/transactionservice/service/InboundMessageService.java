@@ -4,6 +4,7 @@ import com.bankflow.transactionservice.calendar.BusinessCalendar;
 import com.bankflow.common.exception.BusinessException;
 import com.bankflow.transactionservice.client.AccountClient;
 import com.bankflow.transactionservice.dto.AccountResponse;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.entity.*;
 import com.bankflow.transactionservice.pacs.*;
 import com.bankflow.transactionservice.repository.TransactionRepository;
@@ -647,9 +648,36 @@ public class InboundMessageService {
     private void settle(Transaction transaction) {
 
         /*
-         * Nothing further is booked. The suspense credit made when the payment
-         * was sent already records the outflow; settlement only confirms it.
+         * Settlement is a booking, not just a status.
+         *
+         * Sending the payment credited suspense: gone from the customer,
+         * arrived nowhere. The scheme confirming it is the moment it arrives
+         * -- so suspense is cleared and the bank's position at the central
+         * bank falls by the same amount.
+         *
+         * This used to change the status and book nothing, on the reasoning
+         * that the suspense credit already recorded the outflow. It did, and
+         * it then recorded it for ever: suspense never emptied, and a balance
+         * meant to say how much is in flight ended up holding every payment
+         * the bank had ever completed.
          */
+        Currency currency = transaction.getCurrency();
+        String reference = transaction.getTransactionReference();
+
+        ledgerPoster.debit(
+                transaction,
+                suspenseAccounts.suspenseAccountId(currency),
+                transaction.getAmount(),
+                reference + "-STL-SUSPENSE"
+        );
+
+        ledgerPoster.credit(
+                transaction,
+                suspenseAccounts.settlementAccountId(currency),
+                transaction.getAmount(),
+                reference + "-STL"
+        );
+
         transaction.setStatus(TransactionStatus.SETTLED);
         transactionRepository.save(transaction);
 
@@ -700,12 +728,27 @@ public class InboundMessageService {
             );
         }
 
+        /*
+         * Given back the same way it was taken: the payment and the charge as
+         * separate lines, so a customer reading their statement sees the
+         * refund of each rather than one figure that matches neither.
+         */
         ledgerPoster.credit(
                 transaction,
                 transaction.getSourceAccountId(),
-                amount.add(fee),
+                amount,
                 reference + "-RETURN-CREDIT"
         );
+
+        if (fee.compareTo(BigDecimal.ZERO) > 0) {
+
+            ledgerPoster.credit(
+                    transaction,
+                    transaction.getSourceAccountId(),
+                    fee,
+                    reference + "-RETURN-FEE-CREDIT"
+            );
+        }
 
         transaction.setStatus(TransactionStatus.REJECTED);
 
