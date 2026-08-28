@@ -20,6 +20,18 @@ public record AccountResponse(
         Long clientId,
         String clientName,
         String clientStatus,
+
+        /*
+         * The holder's address, carried on the account because that is what
+         * the payment engine has in hand when it builds a message. The
+         * scheme's pacs.008 defines PstlAdr for the debtor and there was
+         * previously nothing to put in it.
+         */
+        String clientAddressLine1,
+        String clientAddressLine2,
+        String clientCity,
+        String clientPostalCode,
+        String clientCountry,
         String accountNumber,
         String iban,
         AccountType accountType,

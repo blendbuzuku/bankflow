@@ -1,5 +1,7 @@
 package com.bankflow.accountservice.service;
 
+import com.bankflow.accountservice.audit.AuditService;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.accountservice.dto.AccountCreateRequest;
 import com.bankflow.accountservice.dto.AccountResponse;
 import com.bankflow.accountservice.entity.Account;
@@ -22,7 +24,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class AccountService {
@@ -31,17 +35,24 @@ public class AccountService {
     private final ClientRepository clientRepository;
     private final IbanService ibanService;
     private final BalanceOperationRepository balanceOperationRepository;
+    private final AuditService auditService;
+    private final SignatoryService signatoryService;
 
     public AccountService(
             AccountRepository accountRepository,
             ClientRepository clientRepository,
             IbanService ibanService,
-            BalanceOperationRepository balanceOperationRepository) {
+            BalanceOperationRepository balanceOperationRepository,
+            AuditService auditService,
+            SignatoryService signatoryService) {
+
+        this.signatoryService = signatoryService;
 
         this.accountRepository = accountRepository;
         this.clientRepository = clientRepository;
         this.ibanService = ibanService;
         this.balanceOperationRepository = balanceOperationRepository;
+        this.auditService = auditService;
     }
 
     @PreAuthorize("hasAnyRole('TELLER', 'OPERATIONS', 'BANK_ADMIN')")
@@ -146,6 +157,28 @@ public class AccountService {
 
         Account savedAccount = accountRepository.save(account);
 
+        Map<String, Object> details = new LinkedHashMap<>();
+
+        details.put("iban", savedAccount.getIban());
+        details.put("accountType", savedAccount.getAccountType());
+        details.put("currency", savedAccount.getCurrency());
+        details.put("purpose", purpose);
+        details.put("clientId", client.getId());
+
+        /*
+         * Opening an account moves no money -- it starts at nil by definition.
+         * It is still the act that makes every later movement possible, which
+         * is why it belongs on the trail beside them rather than nowhere.
+         */
+        auditService.record(
+                AuditEventType.ACCOUNT_OPENED,
+                "Account",
+                String.valueOf(savedAccount.getId()),
+                "%s opened for client %s".formatted(
+                        savedAccount.getIban(), client.getId()),
+                details
+        );
+
         return mapToResponse(savedAccount);
     }
 
@@ -205,7 +238,24 @@ public class AccountService {
 
         account.setStatus(AccountStatus.CLOSED);
 
-        return mapToResponse(accountRepository.save(account));
+        Account saved = accountRepository.save(account);
+
+        Map<String, Object> details = new LinkedHashMap<>();
+
+        details.put("iban", saved.getIban());
+        details.put("accountType", saved.getAccountType());
+        details.put("currency", saved.getCurrency());
+        details.put("balanceAtClosure", BigDecimal.ZERO);
+
+        auditService.record(
+                AuditEventType.ACCOUNT_CLOSED,
+                "Account",
+                String.valueOf(saved.getId()),
+                "%s closed at nil balance".formatted(saved.getIban()),
+                details
+        );
+
+        return mapToResponse(saved);
     }
 
     @PreAuthorize(
@@ -295,8 +345,12 @@ public class AccountService {
     @Transactional(readOnly = true)
     public List<AccountResponse> getAccountsForUser(Long userId) {
 
-        return clientRepository.findByUserId(userId)
-                .map(client -> accountRepository.findByClientId(client.getId())
+        /*
+         * Through the signatory table rather than clients.user_id, so a second
+         * person named on a company account sees it too.
+         */
+        return signatoryService.clientIdFor(userId)
+                .map(clientId -> accountRepository.findByClientId(clientId)
                         .stream()
                         .map(this::mapToResponse)
                         .toList())
@@ -308,14 +362,14 @@ public class AccountService {
 
         Long userId = SecurityUtils.getCurrentUserId();
 
-        Client client = clientRepository.findByUserId(userId)
+        Long clientId = signatoryService.clientIdFor(userId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
                                 "No client profile exists for the current user"
                         )
                 );
 
-        return accountRepository.findByClientId(client.getId())
+        return accountRepository.findByClientId(clientId)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -361,6 +415,13 @@ public class AccountService {
                 holder.getId(),
                 holder.getDisplayName(),
                 holder.getStatus(),
+
+                holder.getAddressLine1(),
+                holder.getAddressLine2(),
+                holder.getCity(),
+                holder.getPostalCode(),
+                holder.getCountry(),
+
                 account.getAccountNumber(),
                 account.getIban(),
                 account.getAccountType(),

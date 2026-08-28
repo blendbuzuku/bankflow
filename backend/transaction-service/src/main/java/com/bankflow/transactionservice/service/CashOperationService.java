@@ -4,6 +4,7 @@ import com.bankflow.transactionservice.calendar.BusinessCalendar;
 import com.bankflow.common.exception.BusinessException;
 import com.bankflow.transactionservice.client.AccountClient;
 import com.bankflow.transactionservice.dto.AccountResponse;
+import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.entity.*;
 import com.bankflow.transactionservice.repository.TransactionRepository;
 import com.bankflow.transactionservice.security.AuthenticatedUser;
@@ -26,8 +27,18 @@ import java.util.UUID;
  * which the reconciliation control correctly reports as a break, because that is
  * exactly what it is.
  *
- * The contra leg is the suspense account, mirroring an inbound payment: value
- * arriving from outside debits suspense and credits the customer.
+ * The contra leg is the vault: the cash the bank physically holds. Notes over
+ * the counter debit it and notes back out credit it, so its movements track a
+ * real drawer -- countable, which is the point. (The stored balance runs
+ * negative, since that column is kept credits-minus-debits for customer
+ * accounts and an asset is the other way round.)
+ *
+ * It used to be suspense. Suspense means value in flight to the scheme, and it
+ * clears when the scheme answers; cash is neither in flight nor ever answered
+ * for. Booking it there left a residue nothing could resolve, and made the
+ * suspense balance useless for the one question it exists to answer -- how
+ * much is currently in flight -- because it also held every note ever
+ * deposited.
  */
 @Service
 public class CashOperationService {
@@ -58,7 +69,7 @@ public class CashOperationService {
         this.businessCalendar = businessCalendar;
     }
 
-    /** Cash paid in: DR suspense, CR the customer. */
+    /** Cash paid in: DR the vault, CR the customer. */
     @Transactional
     public Transaction deposit(
             Long accountId,
@@ -87,9 +98,9 @@ public class CashOperationService {
 
         ledgerPoster.debit(
                 transaction,
-                suspenseAccounts.suspenseAccountId(currency),
+                suspenseAccounts.vaultAccountId(currency),
                 amount,
-                reference + "-SUSPENSE"
+                reference + "-VAULT"
         );
 
         ledgerPoster.credit(
@@ -102,7 +113,7 @@ public class CashOperationService {
         return complete(transaction, "deposited into", amount, currency);
     }
 
-    /** Cash taken out: DR the customer, CR suspense. */
+    /** Cash taken out: DR the customer, CR the vault. */
     @Transactional
     public Transaction withdraw(
             Long accountId,
@@ -144,9 +155,9 @@ public class CashOperationService {
 
         ledgerPoster.credit(
                 transaction,
-                suspenseAccounts.suspenseAccountId(currency),
+                suspenseAccounts.vaultAccountId(currency),
                 amount,
-                reference + "-SUSPENSE"
+                reference + "-VAULT"
         );
 
         return complete(transaction, "withdrawn from", amount, currency);

@@ -81,9 +81,17 @@ public class InternalAccountSeeder implements ApplicationRunner {
 
         int created = 0;
 
+        /*
+         * One of each per currency. They cannot be pooled: offsetting a EUR
+         * obligation against a USD one needs an exchange rate and an FX
+         * position, and a single mixed-currency balance would be a number in
+         * no currency at all.
+         */
         for (Currency currency : Currency.values()) {
             created += ensureAccount(bank, AccountType.SUSPENSE, currency);
             created += ensureAccount(bank, AccountType.INCOME, currency);
+            created += ensureAccount(bank, AccountType.VAULT, currency);
+            created += ensureAccount(bank, AccountType.SETTLEMENT, currency);
         }
 
         if (created > 0) {
