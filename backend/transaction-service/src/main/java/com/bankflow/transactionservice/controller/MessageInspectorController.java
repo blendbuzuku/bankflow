@@ -95,9 +95,12 @@ public class MessageInspectorController {
 
         int capped = Math.max(1, Math.min(limit, MAX_LIMIT));
 
-        String term = q == null || q.isBlank()
-                ? null
-                : "%" + q.trim().toLowerCase() + "%";
+        /*
+         * Passed as typed. The percent signs this used to wrap it in were SQL
+         * LIKE wildcards; the archive matches on a regex now, where they would
+         * be literal characters nobody has in a reference.
+         */
+        String term = q;
 
         return ResponseEntity.ok(
                 repository
