@@ -234,12 +234,23 @@ export class MessageView {
     const credits = this.descendant(this.descendant(stmt, 'TtlCdtNtries'), 'Sum');
     const debits = this.descendant(this.descendant(stmt, 'TtlDbtNtries'), 'Sum');
 
+    /*
+     * Not "paid in" and "paid out", though they measure the same movements.
+     *
+     * The statement above nets a round trip away: money that left and came
+     * straight back is shown once, in a figure the customer can reconcile
+     * against what they know. These are the scheme's own totals and are gross
+     * by definition, so the two disagree by exactly the amount that went out
+     * and returned. Sharing a label made that look like one of them was
+     * wrong; naming them after the fields they come from says which question
+     * each is answering.
+     */
     if (credits?.value) {
-      facts.push({ label: 'Paid in', value: credits.value });
+      facts.push({ label: 'Total credits', value: credits.value });
     }
 
     if (debits?.value) {
-      facts.push({ label: 'Paid out', value: debits.value });
+      facts.push({ label: 'Total debits', value: debits.value });
     }
 
     return facts;
