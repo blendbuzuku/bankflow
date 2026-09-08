@@ -90,15 +90,35 @@ public class LedgerPoster {
             String operationId,
             LedgerEntryType entryType) {
 
-        LocalDate bookingDate = transaction.getBookingDate() != null
-                ? transaction.getBookingDate()
-                : businessCalendar.today();
+        /*
+         * An entry books on the day it is made, not the day its payment was.
+         *
+         * For the legs of a fresh payment the two are the same day and this
+         * changes nothing. They part company when something answers a payment
+         * later than it was sent — a settlement confirmation, a return, an
+         * accepted recall — and taking the payment's own date then meant
+         * posting into a day that had already been signed off. The guard below
+         * refused it, correctly, and there was nothing behind the refusal: a
+         * payment that settled yesterday could never be returned, though a
+         * return arriving days afterwards is the ordinary case and not an edge
+         * one.
+         *
+         * The economic date is not lost, it moves to where it belongs. The
+         * value date below still carries the original, so a return booked
+         * today against a payment made last week reads as exactly that.
+         */
+        LocalDate bookingDate = businessCalendar.today();
 
         /*
          * Refused before the balance moves, not after. The account lives in
          * another service, so a posting rejected once the money had already
          * shifted would leave exactly the cross-service half-commit that
          * reconciliation exists to catch.
+         *
+         * Today is open by definition, so this should never fire. It stays as
+         * the assertion of that: if the open day is ever a closed one, the
+         * books stop rather than quietly growing a second set of figures for a
+         * day somebody has already signed.
          */
         closedPeriods.requireOpen(bookingDate);
 
