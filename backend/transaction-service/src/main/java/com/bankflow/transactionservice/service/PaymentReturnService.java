@@ -69,8 +69,8 @@ public class PaymentReturnService {
     /**
      * A payment we sent has come back.
      *
-     * Booked as the mirror of sending it: the suspense position that recorded
-     * the outflow is unwound, and the debtor is credited with whatever actually
+     * Booked as the mirror of sending it: whichever position recorded the
+     * outflow is unwound, and the debtor is credited with whatever actually
      * returned.
      */
     @Transactional
@@ -110,11 +110,29 @@ public class PaymentReturnService {
         String reference = original.getTransactionReference();
         Currency currency = original.getCurrency();
 
+        /*
+         * Which account hands the money back depends on how far the payment
+         * got before it turned around.
+         *
+         * One still in flight never left the bank's position at the central
+         * bank: suspense is holding it, and suspense is what unwinds. One that
+         * settled did leave — suspense was emptied into settlement the moment
+         * the scheme confirmed — so the money comes back the way it went out.
+         *
+         * Taking it from suspense in both cases was the earlier reading. It
+         * balanced, which is why no proof caught it, and it left suspense
+         * permanently short by every payment ever returned while settlement
+         * went on holding money the scheme no longer owed us.
+         */
+        boolean hadSettled = original.getStatus() == TransactionStatus.SETTLED;
+
         ledgerPoster.debit(
                 original,
-                suspenseAccounts.suspenseAccountId(currency),
+                hadSettled
+                        ? suspenseAccounts.settlementAccountId(currency)
+                        : suspenseAccounts.suspenseAccountId(currency),
                 returned,
-                reference + "-RTR-SUSPENSE"
+                reference + (hadSettled ? "-RTR-SETTLEMENT" : "-RTR-SUSPENSE")
         );
 
         ledgerPoster.credit(
@@ -169,8 +187,8 @@ public class PaymentReturnService {
      *
      * Used when the beneficiary cannot or will not keep the money — a closed
      * account found after the fact, or an accepted recall. The beneficiary is
-     * debited and the funds go back out through suspense, carried by a
-     * pacs.004.
+     * debited and the funds go back out through the settlement position,
+     * carried by a pacs.004.
      */
     @Transactional
     public Transaction returnInboundPayment(
@@ -227,6 +245,14 @@ public class PaymentReturnService {
             );
         }
 
+        /*
+         * Taken off the beneficiary and sent back out to the scheme.
+         *
+         * Settlement, not suspense: the money reached the beneficiary, so
+         * suspense emptied when it was credited and has nothing left to give
+         * back. What falls now is the position at the central bank, the same
+         * account that rose when the payment arrived.
+         */
         ledgerPoster.debit(
                 original,
                 original.getDestinationAccountId(),
@@ -236,9 +262,9 @@ public class PaymentReturnService {
 
         ledgerPoster.credit(
                 original,
-                suspenseAccounts.suspenseAccountId(currency),
+                suspenseAccounts.settlementAccountId(currency),
                 amount,
-                transactionReference + "-RTR-SUSPENSE"
+                transactionReference + "-RTR-SETTLEMENT"
         );
 
         PacsMessage message = new PacsMessage();

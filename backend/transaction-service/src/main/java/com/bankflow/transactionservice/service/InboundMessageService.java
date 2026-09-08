@@ -357,11 +357,33 @@ public class InboundMessageService {
         );
 
         /*
-         * Money arriving from the scheme is released out of suspense into the
-         * beneficiary's account, mirroring the outbound direction.
+         * Arriving money is taken in and then released, mirroring the outbound
+         * direction: the scheme delivers it into suspense, and suspense pays
+         * it out to the beneficiary.
+         *
+         * The first pair is the one that used to be missing. Crediting the
+         * beneficiary straight out of suspense balanced the entry but left
+         * suspense a little further below zero on every payment we received,
+         * and never showed the position at the central bank rising to meet it
+         * — so the account that says what is in flight answered nothing, and
+         * the account that says what the scheme owes us was silent.
          */
         Long suspenseId = suspenseAccounts.suspenseAccountId(currency);
         String reference = transaction.getTransactionReference();
+
+        ledgerPoster.debit(
+                transaction,
+                suspenseAccounts.settlementAccountId(currency),
+                parsed.amount(),
+                reference + "-IN-SETTLEMENT"
+        );
+
+        ledgerPoster.credit(
+                transaction,
+                suspenseId,
+                parsed.amount(),
+                reference + "-IN-SUSPENSE"
+        );
 
         ledgerPoster.debit(
                 transaction,
@@ -382,6 +404,8 @@ public class InboundMessageService {
 
         Map<String, Object> posting = new LinkedHashMap<>();
 
+        posting.put("settlementDebited", parsed.amount());
+        posting.put("suspenseCredited", parsed.amount());
         posting.put("suspenseDebited", parsed.amount());
         posting.put("beneficiaryCredited", parsed.amount());
         posting.put("currency", currency.name());
@@ -392,8 +416,10 @@ public class InboundMessageService {
                 reference,
                 "LedgerEntry",
                 reference,
-                "Inbound legs posted: DR suspense %s / CR beneficiary %s, net 0"
-                        .formatted(parsed.amount(), parsed.amount()),
+                ("Inbound legs posted: DR settlement %s / CR suspense %s, "
+                        + "DR suspense %s / CR beneficiary %s, net 0").formatted(
+                        parsed.amount(), parsed.amount(),
+                        parsed.amount(), parsed.amount()),
                 posting
         );
 
