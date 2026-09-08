@@ -10,6 +10,14 @@
       <input type="date" name="date" [(ngModel)]="date" (ngModelChange)="load()" />
       @if (isClosed()) {
         <span class="sealed">Closed</span>
+      } @else if (!isOpenDay()) {
+        <!--
+          Only the open day can be signed off, so offering the button on any
+          other one promises something the close would refuse.
+        -->
+        <span class="elsewhere">
+          The bank is trading into {{ tradingInto() }}
+        </span>
       } @else {
         <button type="button" class="primary" (click)="close()"
                 [disabled]="closing() || !isClean()"

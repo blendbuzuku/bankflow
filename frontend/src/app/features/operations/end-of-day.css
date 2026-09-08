@@ -256,6 +256,25 @@ tr.broken td {
   text-transform: uppercase;
 }
 
+/*
+ * Where the bank actually is, shown when you are looking somewhere else.
+ * Quieter than the sealed pill: it reports a fact rather than a verdict on
+ * the day on screen.
+ */
+.elsewhere {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 9px;
+  background: #eef2f8;
+  border: 1px solid #d9e1ec;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .sealed-card {
   border-left: 4px solid #15803d;
   margin-bottom: 14px;

@@ -48,11 +48,43 @@ export class EndOfDay implements OnInit {
   readonly history = signal<DayCloseRecord[]>([]);
   readonly closeRecord = signal<DayCloseRecord | null>(null);
 
-  /** Defaults to today, but any past day can be re-proved. */
+  /**
+   * The day on screen. Starts on the open one, but any past day can be
+   * re-proved.
+   *
+   * Seeded from the browser only until the bank answers. It used to be seeded
+   * from the browser and left there, which held right up until a day was
+   * signed off — the bank moves on and the calendar does not, so the screen
+   * went on offering the day it had just sealed, proving a closed day and
+   * refusing to close it again.
+   */
   date = new Date().toISOString().slice(0, 10);
 
+  /** What the bank says the open day is, once it has told us. */
+  readonly tradingInto = signal<string | null>(null);
+
   ngOnInit(): void {
-    this.load();
+
+    this.transactionService.businessDate().subscribe({
+      next: business => {
+        this.tradingInto.set(business.tradingInto);
+        this.date = business.tradingInto;
+        this.load();
+      },
+
+      /*
+       * The calendar date is the fallback and usually right — the two only
+       * differ once the bank is behind the clock. Better a day that may be
+       * wrong than a screen with nothing on it.
+       */
+      error: () => this.load(),
+    });
+  }
+
+  /** Whether the day on screen is the one the bank is trading into. */
+  isOpenDay(): boolean {
+    const open = this.tradingInto();
+    return open === null || open === this.date;
   }
 
   /** Whether the day has already been signed off and sealed. */
@@ -137,13 +169,25 @@ export class EndOfDay implements OnInit {
         if (result.closed) {
           this.toasts.success(
             `${result.bookingDate} closed`,
-            result.summary,
+            `${result.summary} Now trading into ${result.tradingInto}.`,
           );
         } else {
           this.toasts.error(
             `${result.bookingDate} did not close`,
             result.summary,
           );
+        }
+
+        /*
+         * Follow the bank forward. A close moves the open day on, and leaving
+         * the screen on the day just sealed would show a sign-off as the
+         * thing still to be done.
+         */
+        if (result.closed && result.tradingInto) {
+          this.tradingInto.set(result.tradingInto);
+          this.date = result.tradingInto;
+          this.load();
+          return;
         }
 
         this.loadSummary(this.date);

@@ -338,6 +338,17 @@ export interface DayCloseRecord {
   summary: string;
 }
 
+export interface BusinessDate {
+
+  /** The day the bank is working in, which a close moves forward. */
+  tradingInto: string;
+
+  /** The date on the wall, which it does not. */
+  calendarDate: string;
+
+  daysBehind: number;
+}
+
 export interface DayCloseResult {
   bookingDate: string;
   closed: boolean;
@@ -345,6 +356,9 @@ export interface DayCloseResult {
   reconciliation: Reconciliation;
   summary: string;
   record: DayCloseRecord | null;
+
+  /** The day the bank moved on to, which a successful close advances. */
+  tradingInto: string;
 }
 
 export interface CustomerLimits {
@@ -635,6 +649,18 @@ export class TransactionService {
   /** The recent run of days and whether each one closed. */
   dayHistory(): Observable<DayCloseRecord[]> {
     return this.http.get<DayCloseRecord[]>('/api/end-of-day/history');
+  }
+
+  /**
+   * Which day the bank is trading into, and how far that is behind the clock.
+   *
+   * The browser's own date is no answer to this. Closing a day moves the bank
+   * on without moving the calendar, so the two agree right up until the moment
+   * somebody signs a day off — which is exactly when a screen asking the wrong
+   * one starts showing the day that was just sealed.
+   */
+  businessDate(): Observable<BusinessDate> {
+    return this.http.get<BusinessDate>('/api/end-of-day/business-date');
   }
 
   // --- statements ---

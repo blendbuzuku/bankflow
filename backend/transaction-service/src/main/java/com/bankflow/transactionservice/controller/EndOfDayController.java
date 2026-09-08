@@ -53,6 +53,20 @@ public class EndOfDayController {
     }
 
     /**
+     * The day meant when none is named: the one the bank is trading into.
+     *
+     * Not the date on the wall. The two agree until a day is signed off, and
+     * then part company for as long as the bank stays behind the clock — so
+     * defaulting to the calendar meant that the moment somebody closed a day,
+     * every screen here went on showing it: proving a sealed day, summarising
+     * a sealed day, and refusing to close it again because it was already
+     * closed. The open day was reachable only by typing its date.
+     */
+    private LocalDate openDayOr(LocalDate date) {
+        return date != null ? date : businessCalendar.today();
+    }
+
+    /**
      * Checks the ledger against what account-service says actually moved.
      */
     @GetMapping("/reconciliation")
@@ -62,9 +76,7 @@ public class EndOfDayController {
             LocalDate date) {
 
         return ResponseEntity.ok(
-                reconciliationService.reconcile(
-                        date != null ? date : LocalDate.now()
-                )
+                reconciliationService.reconcile(openDayOr(date))
         );
     }
 
@@ -79,9 +91,7 @@ public class EndOfDayController {
             LocalDate date) {
 
         return ResponseEntity.ok(
-                endOfDayService.trialBalance(
-                        date != null ? date : LocalDate.now()
-                )
+                endOfDayService.trialBalance(openDayOr(date))
         );
     }
 
@@ -107,7 +117,7 @@ public class EndOfDayController {
             LocalDate date) {
 
         return ResponseEntity.ok(
-                dayCloseService.close(date != null ? date : LocalDate.now())
+                dayCloseService.close(openDayOr(date))
         );
     }
 
@@ -120,7 +130,7 @@ public class EndOfDayController {
             LocalDate date) {
 
         return ResponseEntity.ok(
-                daySummaryService.summarise(date != null ? date : LocalDate.now())
+                daySummaryService.summarise(openDayOr(date))
         );
     }
 
@@ -154,10 +164,7 @@ public class EndOfDayController {
             LocalDate date) {
 
         return ResponseEntity.ok(
-                endOfDayService.accountBreakdown(
-                        date != null ? date : LocalDate.now(),
-                        currency
-                )
+                endOfDayService.accountBreakdown(openDayOr(date), currency)
         );
     }
 }
