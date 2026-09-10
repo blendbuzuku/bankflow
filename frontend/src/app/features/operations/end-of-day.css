@@ -433,3 +433,134 @@ table td:last-child { padding-right: 0; }
  */
 thead th.numeric,
 th.numeric { text-align: right; }
+
+/* --- the calendar: where the bank stands against the wall date --- */
+
+/*
+ * Coloured by what it asks of the reader. Behind is amber because there is
+ * work to do; in step and ahead are quiet, because there is none yet.
+ */
+.calendar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px 24px;
+  align-items: start;
+  border-left: 4px solid #1565c0;
+}
+
+.calendar.behind { border-left-color: #b45309; background: #fffdf7; }
+.calendar.in-step { border-left-color: #15803d; }
+.calendar.ahead { border-left-color: #64748b; }
+
+.calendar-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.calendar-state {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.calendar.behind .calendar-state { color: #92400e; }
+
+.calendar-sub {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #64748b;
+  max-width: 62ch;
+}
+
+.calendar-facts {
+  display: flex;
+  gap: 22px;
+  margin: 0;
+  grid-row: 1 / span 2;
+  grid-column: 2;
+}
+
+.calendar-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.calendar-facts dt {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.calendar-facts dd {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+/*
+ * The overdue days, in the order they have to be closed. The first is the
+ * only one that can be; it is marked, and the rest wait behind it.
+ */
+.overdue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #fcd9a6;
+  border-radius: 999px;
+  background: #fff;
+  color: #92400e;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+
+.day-chip:hover { background: #fff7ed; }
+
+.day-chip.next {
+  background: #b45309;
+  border-color: #b45309;
+  color: #fff;
+}
+
+.day-chip.next:hover { background: #92400e; }
+
+/* The day currently on screen, whichever it is. */
+.day-chip.viewing { box-shadow: 0 0 0 3px rgba(180, 83, 9, .22); }
+
+.day-chip:focus-visible {
+  outline: 2px solid #1565c0;
+  outline-offset: 2px;
+}
+
+.day-chip .tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .85;
+}
+
+@media (max-width: 760px) {
+  .calendar { grid-template-columns: 1fr; }
+  .calendar-facts { grid-row: auto; grid-column: auto; flex-wrap: wrap; }
+}

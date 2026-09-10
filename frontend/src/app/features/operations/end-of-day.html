@@ -10,25 +10,98 @@
       <input type="date" name="date" [(ngModel)]="date" (ngModelChange)="load()" />
       @if (isClosed()) {
         <span class="sealed">Closed</span>
-      } @else if (!isOpenDay()) {
+      } @else if (blockedReason()) {
         <!--
-          Only the open day can be signed off, so offering the button on any
-          other one promises something the close would refuse.
+          Only the open day can be signed off, and only once it has begun, so
+          offering the button anywhere else promises something the close would
+          refuse. What is offered instead is the reason.
         -->
-        <span class="elsewhere">
-          The bank is trading into {{ tradingInto() }}
-        </span>
+        <span class="elsewhere">{{ blockedReason() }}</span>
       } @else {
         <button type="button" class="primary" (click)="close()"
                 [disabled]="closing() || !isClean()"
                 [attr.title]="isClean()
                   ? 'Sign the day off. Nothing can be booked into it afterwards.'
                   : 'The books do not prove yet, so the day cannot be closed.'">
-          @if (closing()) { Closing... } @else { Close day }
+          @if (closing()) { Closing... } @else { Close {{ shortDay(date) }} }
         </button>
       }
     </div>
   </header>
+
+  <!--
+    Where the bank stands against the calendar, first, because it decides what
+    the rest of the screen is for: a day to prove and sign off, several of them
+    in order, or nothing until tomorrow.
+  -->
+  @if (business(); as b) {
+    <section class="card calendar"
+             [class.behind]="standing() === 'behind'"
+             [class.ahead]="standing() === 'ahead'"
+             [class.in-step]="standing() === 'inStep'">
+
+      <div class="calendar-main">
+        <span class="calendar-state">
+          @switch (standing()) {
+            @case ('behind') {
+              {{ b.overdueDays.length }}
+              {{ b.overdueDays.length === 1 ? 'day' : 'days' }} not closed
+            }
+            @case ('ahead') { Today's books are closed }
+            @default { In step with the calendar }
+          }
+        </span>
+
+        <span class="calendar-sub">
+          @switch (standing()) {
+            @case ('behind') {
+              The bank is still trading into {{ day(b.tradingInto) }}, and today
+              is {{ day(b.calendarDate) }}. Close them oldest first — each close
+              moves the bank on one day.
+            }
+            @case ('ahead') {
+              Business done now books to {{ day(b.tradingInto) }}, which can be
+              closed once it has begun.
+            }
+            @default {
+              Trading into today, {{ day(b.calendarDate) }}. Close it at the end
+              of business.
+            }
+          }
+        </span>
+      </div>
+
+      @if (standing() === 'behind') {
+        <ol class="overdue" aria-label="Days not yet closed">
+          @for (d of b.overdueDays; track d; let first = $first) {
+            <li>
+              <button type="button" class="day-chip"
+                      [class.next]="first" [class.viewing]="d === date"
+                      (click)="goTo(d)">
+                {{ shortDay(d) }}
+                @if (first) { <span class="tag">close next</span> }
+              </button>
+            </li>
+          }
+        </ol>
+      }
+
+      <dl class="calendar-facts">
+        <div><dt>Trading into</dt><dd>{{ day(b.tradingInto) }}</dd></div>
+        <div><dt>Calendar</dt><dd>{{ day(b.calendarDate) }}</dd></div>
+        <div>
+          <dt>Last closed</dt>
+          <dd>
+            @if (b.lastClosed; as l) {
+              {{ shortDay(l.bookingDate) }} · {{ l.closedByUsername }}
+            } @else {
+              Never
+            }
+          </dd>
+        </div>
+      </dl>
+    </section>
+  }
 
   @if (error()) { <div class="alert error">{{ error() }}</div> }
 
@@ -94,7 +167,8 @@
       }
 
       <section class="card">
-        <h2>What happened today</h2>
+        <!-- Named, not "today": the day on screen is often not today. -->
+        <h2>What happened on {{ shortDay(date) }}</h2>
 
         @if (day.activity.length === 0) {
           <p class="empty">Nothing was booked on this day.</p>

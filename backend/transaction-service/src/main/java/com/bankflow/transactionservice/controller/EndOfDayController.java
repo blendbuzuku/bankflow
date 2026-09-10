@@ -145,6 +145,34 @@ public class EndOfDayController {
         result.put("calendarDate", LocalDate.now());
         result.put("daysBehind", businessCalendar.daysBehindTheClock());
 
+        /*
+         * Named, not just counted. "Two days behind" says there is a problem;
+         * the dates say which days somebody has to prove and sign off, and in
+         * what order.
+         */
+        result.put("overdueDays", businessCalendar.overdueDays());
+
+        /*
+         * The most recent sign-off, so a screen can say who last closed and
+         * when without fetching the whole register to find out.
+         */
+        List<DayClose> closes = dayCloseService.history();
+
+        if (!closes.isEmpty()) {
+
+            DayClose last = closes.get(0);
+            Map<String, Object> lastClosed = new LinkedHashMap<>();
+
+            lastClosed.put("bookingDate", last.getBookingDate());
+            lastClosed.put("closedByUsername", last.getClosedByUsername());
+            lastClosed.put("closedAt", last.getClosedAt());
+
+            result.put("lastClosed", lastClosed);
+
+        } else {
+            result.put("lastClosed", null);
+        }
+
         return ResponseEntity.ok(result);
     }
 

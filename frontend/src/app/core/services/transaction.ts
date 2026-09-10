@@ -346,7 +346,17 @@ export interface BusinessDate {
   /** The date on the wall, which it does not. */
   calendarDate: string;
 
+  /** Negative once today is closed and the bank is trading into tomorrow. */
   daysBehind: number;
+
+  /** Days that should have been signed off and have not, oldest first. */
+  overdueDays: string[];
+
+  lastClosed: {
+    bookingDate: string;
+    closedByUsername: string;
+    closedAt: string;
+  } | null;
 }
 
 export interface DayCloseResult {

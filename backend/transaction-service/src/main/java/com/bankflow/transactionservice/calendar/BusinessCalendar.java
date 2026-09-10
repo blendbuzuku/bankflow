@@ -92,6 +92,27 @@ public class BusinessCalendar {
         return java.time.temporal.ChronoUnit.DAYS.between(today(), LocalDate.now());
     }
 
+    /**
+     * The days that should already have been signed off and have not, oldest
+     * first.
+     *
+     * From the open day up to, but not including, today: today is still
+     * trading and closes tonight, so it is not overdue. Every day before the
+     * open one is closed already — the business date only moves when a close
+     * succeeds — so this is the whole of what is outstanding, and it can only
+     * be worked through in order.
+     */
+    @Transactional
+    public java.util.List<LocalDate> overdueDays() {
+
+        LocalDate open = today();
+        LocalDate clock = LocalDate.now();
+
+        return open.isBefore(clock)
+                ? open.datesUntil(clock).toList()
+                : java.util.List.of();
+    }
+
     private LocalDate seed() {
 
         BusinessDate seeded = new BusinessDate();

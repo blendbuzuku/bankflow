@@ -85,6 +85,24 @@ public class DayCloseService {
             );
         }
 
+        /*
+         * Nor a day that has not begun. After tonight's close the bank trades
+         * into tomorrow, which is right — business done this evening belongs
+         * there — but tomorrow is still open for all of tomorrow. Closing it
+         * now would seal a day before any of it happened, and nothing would
+         * stop the next click doing the same to the day after.
+         */
+        LocalDate calendar = LocalDate.now();
+
+        if (bookingDate.isAfter(calendar)) {
+            throw new BusinessException(
+                    ("%s has not started yet, so there is nothing to close. "
+                            + "Business done now books to it, and it can be "
+                            + "closed from %s onwards.").formatted(
+                            bookingDate, bookingDate)
+            );
+        }
+
         repository.findByBookingDate(bookingDate).ifPresent(already -> {
             throw new BusinessException(
                     "%s was already closed by %s on %s".formatted(
