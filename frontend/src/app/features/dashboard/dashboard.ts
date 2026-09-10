@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe, formatNumber } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -15,6 +15,7 @@ import { Onboarding } from './onboarding';
 import { MessageView } from '../../shared/message-view';
 import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 import { Toasts } from '../../core/services/toasts';
+import { Confirm } from '../../core/services/confirm';
 import {
   COUNTRIES_COMMON,
   COUNTRIES_REST,
@@ -83,6 +84,7 @@ export class Dashboard implements OnInit, HasUnsavedChanges {
   private readonly transactionService = inject(TransactionService);
   private readonly toasts = inject(Toasts);
   private readonly bankDirectory = inject(BankDirectoryService);
+  private readonly confirm = inject(Confirm);
 
   readonly banks = signal<CorrespondentBank[]>([]);
 
@@ -456,7 +458,53 @@ export class Dashboard implements OnInit, HasUnsavedChanges {
       : !!this.destinationAccountId;
   }
 
+  /**
+   * One look at the payment before it goes.
+   *
+   * A customer typing an IBAN at home has no teller beside them to read it
+   * back. This is that read-back: who the money goes to and how much, in the
+   * form they will see it afterwards.
+   */
   send(): void {
+
+    const currency = this.selectedCurrency();
+    const amount = `${formatNumber(this.amount ?? 0, 'en-US', '1.2-2')} ${currency}`;
+
+    const source = this.accounts().find(a => a.id === this.sourceAccountId);
+    const target = this.accounts().find(a => a.id === this.destinationAccountId);
+
+    const facts = [
+      { label: 'From', value: source?.iban ?? '—' },
+      {
+        label: 'To',
+        value: this.isExternal()
+          ? [this.creditorName, this.creditorIban].filter(Boolean).join(' · ')
+          : (target ? [target.clientName, target.iban].filter(Boolean).join(' · ') : '—'),
+      },
+      { label: 'Amount', value: amount },
+    ];
+
+    if (this.remittanceInformation.trim()) {
+      facts.push({ label: 'Reference', value: this.remittanceInformation.trim() });
+    }
+
+    this.confirm.askThen({
+      title: `Send ${amount}?`,
+      message: this.isExternal()
+        ? 'The money leaves your account now and goes to the other bank. Any '
+          + 'charge for this kind of payment is added when it is sent.'
+        : 'The money moves between accounts at this bank straight away.',
+      facts,
+      note: this.isExternal()
+        ? 'Check the IBAN and name carefully. Once sent, getting the money back '
+          + 'depends on the other bank agreeing to return it.'
+        : 'It arrives immediately and cannot be cancelled afterwards.',
+      confirmLabel: 'Send',
+      cancelLabel: 'Check again',
+    }, () => this.doSend());
+  }
+
+  private doSend(): void {
 
     this.sendError.set('');
     this.sendSuccess.set('');

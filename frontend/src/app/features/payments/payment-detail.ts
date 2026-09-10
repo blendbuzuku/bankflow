@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe, formatNumber } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
@@ -11,6 +11,7 @@ import {
   TransactionService,
 } from '../../core/services/transaction';
 import { Toasts } from '../../core/services/toasts';
+import { Confirm } from '../../core/services/confirm';
 import { MessageView } from '../../shared/message-view';
 
 /**
@@ -32,6 +33,7 @@ export class PaymentDetail implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly transactionService = inject(TransactionService);
   private readonly toasts = inject(Toasts);
+  private readonly confirm = inject(Confirm);
 
   readonly transaction = signal<TransactionResponse | null>(null);
   readonly audit = signal<AuditEvent[]>([]);
@@ -141,13 +143,52 @@ export class PaymentDetail implements OnInit {
     this.recallNote = '';
   }
 
+  /**
+   * A camt.056 goes to another bank and cannot be taken back, so it is
+   * checked once before it leaves: which payment, and why.
+   */
   requestRecall(): void {
 
-    const reference = this.transaction()?.transactionReference;
+    const t = this.transaction();
 
-    if (!reference) {
+    if (!t) {
       return;
     }
+
+    const reason = this.recallReasons.find(r => r.code === this.recallReason);
+    const facts = [
+      { label: 'Payment', value: t.transactionReference },
+      {
+        label: 'Amount',
+        value: `${formatNumber(t.amount, 'en-US', '1.2-2')} ${t.currency}`,
+      },
+      {
+        label: 'Sent to',
+        value: [t.creditorName, t.creditorIban].filter(Boolean).join(' · ') || '—',
+      },
+      {
+        label: 'Why',
+        value: reason ? `${reason.code} — ${reason.label}` : this.recallReason,
+      },
+    ];
+
+    if (this.recallNote.trim()) {
+      facts.push({ label: 'Note', value: this.recallNote.trim() });
+    }
+
+    this.confirm.askThen({
+      title: 'Send the recall request?',
+      message: 'This asks the beneficiary\'s bank to return the money. It is a '
+        + 'request — they may refuse, and nothing moves until they agree.',
+      facts,
+      note: 'Once sent it cannot be withdrawn. Their answer arrives as a '
+        + 'payment return, or not at all.',
+      confirmLabel: 'Send camt.056',
+      cancelLabel: 'Not yet',
+    }, () => this.sendRecall(t.transactionReference));
+  }
+
+  private sendRecall(reference: string): void {
 
     this.recalling.set(true);
 

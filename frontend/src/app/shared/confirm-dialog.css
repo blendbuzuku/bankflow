@@ -12,15 +12,21 @@
 }
 
 .dialog {
-  width: min(430px, 100%);
+  width: min(460px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
   padding: 22px 24px 20px;
 
   background: #fff;
   border-radius: 14px;
+  border-top: 4px solid #1565c0;
   box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
 
   animation: rise .14s ease-out;
 }
+
+/* The colour says what kind of yes is being asked for before a word is read. */
+.dialog.is-danger { border-top-color: #b91c1c; }
 
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes rise {
@@ -39,12 +45,69 @@
   color: #0f172a;
 }
 
-.dialog p {
-  margin: 0 0 20px;
+.dialog .message {
+  margin: 0 0 16px;
   font-size: 13.5px;
   line-height: 1.55;
+  color: #475569;
+  max-width: 52ch;
+}
+
+/*
+ * The specifics, as a list to be checked line by line. Labels on the left in
+ * one column so the eye runs down the values, which are what matter.
+ */
+.facts {
+  display: grid;
+  gap: 0;
+  margin: 0 0 16px;
+  padding: 4px 14px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.facts > div {
+  display: grid;
+  grid-template-columns: minmax(96px, 36%) 1fr;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.facts > div:last-child { border-bottom: 0; }
+
+.facts dt {
+  font-size: 12px;
+  font-weight: 600;
   color: #64748b;
-  max-width: 48ch;
+}
+
+.facts dd {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* What cannot be taken back: said once, set apart, and not in red unless it is. */
+.note {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.is-danger .note {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
 }
 
 .actions {

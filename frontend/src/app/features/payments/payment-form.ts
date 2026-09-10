@@ -1,8 +1,9 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, formatNumber } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Toasts } from '../../core/services/toasts';
+import { Confirm } from '../../core/services/confirm';
 import { WorkQueues } from '../../core/services/work-queues';
 import {
   COUNTRIES_COMMON,
@@ -124,6 +125,7 @@ export class PaymentForm implements OnInit, HasUnsavedChanges {
   private readonly toasts = inject(Toasts);
   private readonly queues = inject(WorkQueues);
   private readonly bankDirectory = inject(BankDirectoryService);
+  private readonly confirm = inject(Confirm);
 
   readonly banks = signal<CorrespondentBank[]>([]);
 
@@ -343,7 +345,96 @@ export class PaymentForm implements OnInit, HasUnsavedChanges {
     });
   }
 
+  /**
+   * Prices the payment, then asks.
+   *
+   * The charge is fetched rather than taken from a quote the user may or may
+   * not have asked for, because the question is only worth asking if it shows
+   * the whole of what leaves the account — and a figure without the charge is
+   * not that.
+   */
   submit(): void {
+
+    this.submitError.set('');
+
+    if (!this.amount || this.amount <= 0) {
+      this.ask(null);
+      return;
+    }
+
+    this.transactionService
+      .quote(this.paymentType, this.currency, this.amount, this.chargeBearer)
+      .subscribe({
+        next: fee => {
+          this.quote.set(fee);
+          this.ask(fee);
+        },
+
+        /*
+         * A price that could not be fetched is a line missing from the
+         * question, not a reason to stop — the server prices the payment
+         * again when it books it.
+         */
+        error: () => this.ask(null),
+      });
+  }
+
+  private ask(fee: FeeAssessment | null): void {
+
+    const money = (value: number) =>
+      `${formatNumber(value, 'en-US', '1.2-2')} ${this.currency}`;
+
+    const source = this.accounts().find(a => a.id === this.sourceAccountId);
+    const target = this.accounts().find(a => a.id === this.destinationAccountId);
+
+    const describe = (a: AccountResponse | undefined) =>
+      a ? [a.clientName, a.iban].filter(Boolean).join(' · ') : '—';
+
+    const to = this.isExternal()
+      ? [this.creditorName, this.creditorIban, this.creditorAgentBic]
+        .filter(Boolean).join(' · ')
+      : describe(target);
+
+    const facts = [
+      { label: 'From', value: describe(source) },
+      { label: 'To', value: to || '—' },
+      { label: 'Amount', value: money(this.amount ?? 0) },
+      { label: 'Rail', value: this.rail().label },
+    ];
+
+    if (fee) {
+      facts.push({
+        label: 'Charge',
+        value: fee.debtorFee > 0 ? money(fee.debtorFee) : 'None to the sender',
+      });
+      facts.push({
+        label: 'Total debited',
+        value: money((this.amount ?? 0) + fee.debtorFee),
+      });
+    }
+
+    if (this.remittanceInformation.trim()) {
+      facts.push({ label: 'Reference', value: this.remittanceInformation.trim() });
+    }
+
+    this.confirm.askThen({
+      title: `Send ${money(this.amount ?? 0)}?`,
+      message: this.isExternal()
+        ? 'The sender is debited now and the payment goes to KIPS. A payment '
+          + 'over the approval threshold waits for a second person instead.'
+        : 'An on-us transfer settles on our own books straight away.',
+      facts,
+      note: this.isExternal()
+        ? 'Once it reaches the scheme it cannot be stopped. Getting it back '
+          + 'takes a recall, which the other bank may refuse.'
+        : 'It settles immediately. Reversing it takes a new transfer the '
+          + 'other way.',
+      confirmLabel: 'Send payment',
+      cancelLabel: 'Check again',
+    }, () => this.send());
+  }
+
+  private send(): void {
 
     this.submitError.set('');
     this.submitting.set(true);

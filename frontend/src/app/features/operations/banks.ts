@@ -6,6 +6,7 @@ import {
   CorrespondentBank,
 } from '../../core/services/bank-directory';
 import { Toasts } from '../../core/services/toasts';
+import { Confirm } from '../../core/services/confirm';
 import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 
 /**
@@ -38,6 +39,7 @@ export class Banks implements OnInit, HasUnsavedChanges {
 
   private readonly directory = inject(BankDirectoryService);
   private readonly toasts = inject(Toasts);
+  private readonly confirm = inject(Confirm);
 
   readonly banks = signal<CorrespondentBank[]>([]);
   readonly loading = signal(true);
@@ -140,7 +142,38 @@ export class Banks implements OnInit, HasUnsavedChanges {
     });
   }
 
+  /**
+   * Retiring is asked about; putting one back is not.
+   *
+   * Taking a bank out of the directory stops anyone choosing it for a
+   * payment, which is the consequential direction. Reinstating only makes a
+   * choice available again, and is undone by retiring it.
+   */
   toggle(bank: CorrespondentBank): void {
+
+    if (!bank.active) {
+      this.doToggle(bank);
+      return;
+    }
+
+    this.confirm.askThen({
+      title: `Retire ${bank.name}?`,
+      message: 'It stops being offered when a payment is made. Nothing already '
+        + 'sent is affected.',
+      facts: [
+        { label: 'Bank', value: bank.name },
+        { label: 'BIC', value: bank.bic },
+        { label: 'Country', value: this.countryOf(bank.bic) },
+      ],
+      note: 'Until it is put back, nobody can send a payment to this bank by '
+        + 'choosing it from the list.',
+      confirmLabel: 'Retire bank',
+      cancelLabel: 'Keep it',
+      danger: true,
+    }, () => this.doToggle(bank));
+  }
+
+  private doToggle(bank: CorrespondentBank): void {
 
     this.busy.set(true);
 

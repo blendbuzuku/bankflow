@@ -1,11 +1,12 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe, formatNumber } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../core/services/auth';
 import { Toasts } from '../../core/services/toasts';
 import { WorkQueues } from '../../core/services/work-queues';
+import { Confirm } from '../../core/services/confirm';
 import {
   TransactionResponse,
   TransactionService,
@@ -31,6 +32,7 @@ export class ApprovalQueue implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly toasts = inject(Toasts);
   private readonly queues = inject(WorkQueues);
+  private readonly confirm = inject(Confirm);
 
   readonly pending = signal<TransactionResponse[]>([]);
   readonly loading = signal(true);
@@ -76,7 +78,57 @@ export class ApprovalQueue implements OnInit {
       === this.authService.currentUser()?.username;
   }
 
+  /**
+   * The second pair of eyes, asked to look once more at what it is passing.
+   *
+   * Approving is one click and releases the money to the scheme — the whole
+   * point of four-eyes is that somebody checks, so the check is laid out
+   * where it cannot be skimmed past on the way to the button.
+   */
   approve(transaction: TransactionResponse): void {
+
+    const debited = transaction.amount + (transaction.debtorFeeAmount ?? 0);
+
+    this.confirm.askThen({
+      title: `Approve ${formatNumber(transaction.amount, 'en-US', '1.2-2')} `
+        + `${transaction.currency}?`,
+      message: 'This releases the payment. It leaves the queue and goes out '
+        + 'on the rail below.',
+      facts: [
+        {
+          label: 'Amount',
+          value: `${formatNumber(transaction.amount, 'en-US', '1.2-2')} `
+            + `${transaction.currency}`,
+        },
+        {
+          label: 'To',
+          value: [transaction.creditorName, transaction.creditorIban]
+            .filter(Boolean).join(' · ') || '—',
+        },
+        {
+          label: 'From',
+          value: [transaction.debtorName, transaction.debtorIban]
+            .filter(Boolean).join(' · ') || '—',
+        },
+        {
+          label: 'Rail',
+          value: transaction.paymentTypeName ?? transaction.paymentType ?? '—',
+        },
+        {
+          label: 'Total debited',
+          value: `${formatNumber(debited, 'en-US', '1.2-2')} `
+            + `${transaction.currency}`,
+        },
+        { label: 'Raised by', value: transaction.createdByUsername ?? 'unknown' },
+      ],
+      note: 'Once released it cannot be put back in the queue. Getting the '
+        + 'money back afterwards takes a recall, which the other bank may refuse.',
+      confirmLabel: 'Approve and release',
+      cancelLabel: 'Not yet',
+    }, () => this.release(transaction));
+  }
+
+  private release(transaction: TransactionResponse): void {
 
     this.busy.set(transaction.transactionReference);
     this.error.set('');

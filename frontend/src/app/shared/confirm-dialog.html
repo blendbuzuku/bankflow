@@ -1,19 +1,46 @@
 @if (request(); as r) {
   <div class="backdrop" (click)="answer(false)">
     <div class="dialog" role="alertdialog" aria-modal="true"
+         aria-labelledby="confirm-title" aria-describedby="confirm-message"
+         [class.is-danger]="r.danger"
          (click)="$event.stopPropagation()">
 
-      <h2>{{ r.title }}</h2>
-      <p>{{ r.message }}</p>
+      <h2 id="confirm-title">{{ r.title }}</h2>
+      <p id="confirm-message" class="message">{{ r.message }}</p>
+
+      @if (r.facts.length) {
+        <dl class="facts">
+          @for (f of r.facts; track $index) {
+            <div>
+              <dt>{{ f.label }}</dt>
+              <dd>{{ f.value }}</dd>
+            </div>
+          }
+        </dl>
+      }
+
+      @if (r.note) {
+        <p class="note">{{ r.note }}</p>
+      }
 
       <div class="actions">
-        <button type="button" class="cancel" (click)="answer(false)">
-          {{ r.cancelLabel }}
-        </button>
-        <button type="button" [class.danger]="r.danger"
-                [class.primary]="!r.danger" (click)="answer(true)">
-          {{ r.confirmLabel }}
-        </button>
+        @if (r.cancelLabel) {
+          <button #safe type="button" class="cancel" (click)="answer(false)">
+            {{ r.cancelLabel }}
+          </button>
+          <button type="button" [class.danger]="r.danger"
+                  [class.primary]="!r.danger" (click)="answer(true)">
+            {{ r.confirmLabel }}
+          </button>
+        } @else {
+          <!--
+            Nothing to decide, so the only button is the way out — and it takes
+            the focus, because it is the only thing on the dialog to press.
+          -->
+          <button #safe type="button" class="primary" (click)="answer(true)">
+            {{ r.confirmLabel }}
+          </button>
+        }
       </div>
     </div>
   </div>

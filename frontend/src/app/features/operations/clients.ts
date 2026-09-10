@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, formatNumber } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -12,6 +12,7 @@ import {
 import { TransactionService } from '../../core/services/transaction';
 import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 import { Toasts } from '../../core/services/toasts';
+import { Confirm } from '../../core/services/confirm';
 
 /**
  * The counter: clients, their accounts, and cash in and out.
@@ -71,6 +72,7 @@ export class Clients implements OnInit, HasUnsavedChanges {
   private readonly accountService = inject(AccountService);
   private readonly transactionService = inject(TransactionService);
   private readonly toasts = inject(Toasts);
+  private readonly confirm = inject(Confirm);
 
   readonly clients = signal<ClientResponse[]>([]);
   readonly accounts = signal<AccountResponse[]>([]);
@@ -168,7 +170,28 @@ export class Clients implements OnInit, HasUnsavedChanges {
     return !this.isClosed(account) && Number(account.balance) === 0;
   }
 
+  /** Closing is permanent, and the rows it sits in look alike. */
   close(account: AccountResponse): void {
+
+    this.confirm.askThen({
+      title: 'Close this account?',
+      message: 'It will take no further payments in or out. Its history and '
+        + 'statements are kept.',
+      facts: [
+        { label: 'Holder', value: account.clientName ?? '—' },
+        { label: 'IBAN', value: account.iban },
+        { label: 'Account', value: `${account.accountType} ${account.currency}` },
+        { label: 'Balance', value: `${this.money(account.balance)} ${account.currency}` },
+      ],
+      note: 'A closed account cannot be reopened. The customer would need a new '
+        + 'one, with a new IBAN.',
+      confirmLabel: 'Close account',
+      cancelLabel: 'Keep it open',
+      danger: true,
+    }, () => this.doClose(account));
+  }
+
+  private doClose(account: AccountResponse): void {
 
     this.busy.set(true);
     this.error.set('');
@@ -346,6 +369,34 @@ export class Clients implements OnInit, HasUnsavedChanges {
    */
   activate(client: ClientResponse): void {
 
+    const facts = [
+      { label: 'Client', value: this.clientName(client) },
+      { label: 'Type', value: client.clientType },
+      { label: 'Email', value: client.email },
+    ];
+
+    if (client.dateOfBirth) {
+      facts.push({ label: 'Born', value: client.dateOfBirth });
+    }
+
+    if (client.registrationNumber) {
+      facts.push({ label: 'Registration', value: client.registrationNumber });
+    }
+
+    this.confirm.askThen({
+      title: `Approve ${this.clientName(client)}?`,
+      message: 'Approving says the identity checks are done. From then on '
+        + 'accounts can be opened for them and money can move.',
+      facts,
+      note: 'Only approve once the documents have been seen. The approval is '
+        + 'recorded against your name.',
+      confirmLabel: 'Approve client',
+      cancelLabel: 'Not yet',
+    }, () => this.doActivate(client));
+  }
+
+  private doActivate(client: ClientResponse): void {
+
     this.busy.set(true);
     this.error.set('');
     this.notice.set('');
@@ -390,6 +441,49 @@ export class Clients implements OnInit, HasUnsavedChanges {
       return;
     }
 
+    const client = this.clients().find(c => c.id === this.newAccountClientId);
+
+    /*
+     * The holder already having one of these is the mistake worth catching:
+     * a second current account in the same currency is allowed where it has a
+     * purpose, and is otherwise a slip that has to be closed again later.
+     */
+    const existing = this.customerAccounts().filter(a =>
+      a.clientId === this.newAccountClientId
+      && a.accountType === this.newAccountType
+      && a.currency === this.newAccountCurrency
+      && !this.isClosed(a));
+
+    const facts = [
+      { label: 'For', value: client ? this.clientName(client) : '—' },
+      { label: 'Account', value: `${this.newAccountType} ${this.newAccountCurrency}` },
+    ];
+
+    if (this.newAccountPurpose.trim()) {
+      facts.push({ label: 'Purpose', value: this.newAccountPurpose.trim() });
+    }
+
+    this.confirm.askThen({
+      title: 'Open this account?',
+      message: 'A new IBAN is issued and the account is ready to take payments '
+        + 'straight away.',
+      facts,
+      note: existing.length
+        ? `They already hold ${existing.length} open ${this.newAccountType} `
+          + `${this.newAccountCurrency} ${existing.length === 1 ? 'account' : 'accounts'}. `
+          + 'Make sure this one is meant to be separate.'
+        : '',
+      confirmLabel: 'Open account',
+      cancelLabel: 'Not yet',
+    }, () => this.doOpenAccount());
+  }
+
+  private doOpenAccount(): void {
+
+    if (!this.newAccountClientId) {
+      return;
+    }
+
     this.busy.set(true);
     this.error.set('');
     this.notice.set('');
@@ -422,7 +516,54 @@ export class Clients implements OnInit, HasUnsavedChanges {
     });
   }
 
+  /**
+   * Cash is counted before it is keyed, so the question repeats the figure
+   * that was typed against the account it is going to — an extra zero is
+   * the mistake a teller makes, and the balance afterwards shows it.
+   */
   cash(kind: 'deposit' | 'withdraw'): void {
+
+    if (!this.cashAccountId || !this.cashAmount) {
+      return;
+    }
+
+    const account = this.customerAccounts().find(a => a.id === this.cashAccountId);
+    const amount = Number(this.cashAmount);
+    const currency = account?.currency ?? '';
+    const balance = Number(account?.balance ?? 0);
+    const after = kind === 'deposit' ? balance + amount : balance - amount;
+
+    const facts = [
+      { label: 'Account', value: account ? `${account.clientName ?? '—'} · ${account.iban}` : '—' },
+      { label: kind === 'deposit' ? 'Paying in' : 'Paying out', value: `${this.money(amount)} ${currency}` },
+      { label: 'Balance now', value: `${this.money(balance)} ${currency}` },
+      { label: 'Balance after', value: `${this.money(after)} ${currency}` },
+    ];
+
+    if (this.cashNarrative.trim()) {
+      facts.push({ label: 'Narrative', value: this.cashNarrative.trim() });
+    }
+
+    this.confirm.askThen({
+      title: kind === 'deposit'
+        ? `Pay in ${this.money(amount)} ${currency}?`
+        : `Pay out ${this.money(amount)} ${currency}?`,
+      message: kind === 'deposit'
+        ? 'Count the cash before confirming. It is credited to the account now.'
+        : 'Hand over the cash only after confirming. It is debited from the account now.',
+      facts,
+      note: 'Cash operations are booked at once. A mistake is corrected with '
+        + 'an opposite operation, not by undoing this one.',
+      confirmLabel: kind === 'deposit' ? 'Pay in' : 'Pay out',
+      cancelLabel: 'Check again',
+    }, () => this.doCash(kind));
+  }
+
+  private money(value: number | string): string {
+    return formatNumber(Number(value), 'en-US', '1.2-2');
+  }
+
+  private doCash(kind: 'deposit' | 'withdraw'): void {
 
     if (!this.cashAccountId || !this.cashAmount) {
       return;

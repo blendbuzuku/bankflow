@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, formatNumber } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -8,6 +8,7 @@ import {
   TransactionService,
 } from '../../core/services/transaction';
 import { Toasts } from '../../core/services/toasts';
+import { Confirm } from '../../core/services/confirm';
 import { HasUnsavedChanges } from '../../core/guards/unsaved-changes';
 
 /**
@@ -41,6 +42,7 @@ export class Tariff implements OnInit, HasUnsavedChanges {
 
   private readonly transactions = inject(TransactionService);
   private readonly toasts = inject(Toasts);
+  private readonly confirm = inject(Confirm);
 
   readonly rules = signal<TariffRule[]>([]);
   readonly loading = signal(true);
@@ -211,11 +213,84 @@ export class Tariff implements OnInit, HasUnsavedChanges {
     return null;
   }
 
+  private money(value: number | string | null | undefined): string {
+    return formatNumber(Number(value ?? 0), 'en-US', '1.2-2');
+  }
+
+  private railLabel(code: string): string {
+    return this.rails.find(r => r.code === code)?.label ?? code;
+  }
+
+  /** "0.50 + 0.1%, at least 1.00, at most 25.00" — the rule as a customer meets it. */
+  private priceText(): string {
+
+    const f = this.form;
+    const parts = [`${this.money(f.fixedFee)}`];
+
+    if (Number(f.percentageRate)) {
+      parts.push(`${f.percentageRate}%`);
+    }
+
+    let text = parts.join(' + ');
+
+    if (f.minFee != null) {
+      text += `, at least ${this.money(f.minFee)}`;
+    }
+
+    if (f.maxFee != null) {
+      text += `, at most ${this.money(f.maxFee)}`;
+    }
+
+    return `${text} ${f.currency}`;
+  }
+
+  /**
+   * A price is what every customer on this rail pays from the day it takes
+   * effect. It is shown once more as a customer would meet it — against a
+   * payment of a real size — because a misplaced decimal in a fee field reads
+   * as a sensible number until it is multiplied by every payment.
+   */
   save(): void {
 
     if (this.formError()) {
       return;
     }
+
+    const amending = this.amending() !== null;
+    const f = this.form;
+
+    const band = f.maxAmount == null
+      ? `${this.money(f.minAmount)} and above`
+      : `${this.money(f.minAmount)} to ${this.money(f.maxAmount)}`;
+
+    const example = [100, 1000, 10000].find(a => this.inBand(a))
+      ?? (Number(f.minAmount) || 0);
+
+    this.confirm.askThen({
+      title: amending ? `Change the price of ${f.ruleCode}?` : `Add ${f.ruleCode}?`,
+      message: amending
+        ? 'The new price replaces the current one from the date below. '
+          + 'Payments already made keep the charge they had.'
+        : 'This line prices every matching payment from now on.',
+      facts: [
+        { label: 'Line', value: `${f.ruleCode} — ${f.description}` },
+        { label: 'Rail', value: `${this.railLabel(f.paymentType)} · ${f.currency}` },
+        { label: 'Payments of', value: `${band} ${f.currency}` },
+        { label: 'Charge', value: this.priceText() },
+        {
+          label: `On ${this.money(example)}`,
+          value: `${this.money(this.exampleCharge(example))} ${f.currency}`,
+        },
+        { label: 'Takes effect', value: f.validFrom ?? 'Now' },
+      ],
+      note: 'Every customer paying on this rail is charged this price. Check '
+        + 'the example — a misplaced decimal is easy to miss in the form.',
+      confirmLabel: amending ? 'Change the price' : 'Add tariff line',
+      cancelLabel: 'Check again',
+    }, () => this.doSave());
+  }
+
+  private doSave(): void {
 
     this.busy.set(true);
 
@@ -247,6 +322,24 @@ export class Tariff implements OnInit, HasUnsavedChanges {
 
   retire(rule: TariffRule): void {
 
+    this.confirm.askThen({
+      title: `Retire ${rule.ruleCode}?`,
+      message: 'It stops pricing new payments. Older payments keep the charge '
+        + 'it gave them, and the line stays on the record to explain it.',
+      facts: [
+        { label: 'Line', value: `${rule.ruleCode} — ${rule.description}` },
+        { label: 'Rail', value: `${rule.paymentTypeName} · ${rule.currency}` },
+      ],
+      note: 'If no other line covers these payments, they will be charged '
+        + 'nothing until one does.',
+      confirmLabel: 'Retire line',
+      cancelLabel: 'Keep it',
+      danger: true,
+    }, () => this.doRetire(rule));
+  }
+
+  private doRetire(rule: TariffRule): void {
+
     this.busy.set(true);
 
     this.transactions.retireTariffRule(rule.id).subscribe({
@@ -267,6 +360,21 @@ export class Tariff implements OnInit, HasUnsavedChanges {
   }
 
   reinstate(rule: TariffRule): void {
+
+    this.confirm.askThen({
+      title: `Put ${rule.ruleCode} back in use?`,
+      message: 'It prices matching payments again from now on.',
+      facts: [
+        { label: 'Line', value: `${rule.ruleCode} — ${rule.description}` },
+        { label: 'Rail', value: `${rule.paymentTypeName} · ${rule.currency}` },
+      ],
+      note: 'Customers paying on this rail start being charged by it straight away.',
+      confirmLabel: 'Put back',
+      cancelLabel: 'Leave retired',
+    }, () => this.doReinstate(rule));
+  }
+
+  private doReinstate(rule: TariffRule): void {
 
     this.busy.set(true);
 

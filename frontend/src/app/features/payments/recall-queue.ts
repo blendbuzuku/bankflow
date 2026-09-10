@@ -6,6 +6,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth';
 import { Toasts } from '../../core/services/toasts';
 import { WorkQueues } from '../../core/services/work-queues';
+import { Confirm } from '../../core/services/confirm';
 import {
   RecallResponse,
   TransactionService,
@@ -31,6 +32,7 @@ export class RecallQueue implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly toasts = inject(Toasts);
   private readonly queues = inject(WorkQueues);
+  private readonly confirm = inject(Confirm);
 
   readonly recalls = signal<RecallResponse[]>([]);
   readonly loading = signal(true);
@@ -82,7 +84,43 @@ export class RecallQueue implements OnInit {
     this.decisionNote = '';
   }
 
+  /** What the decision is about, laid out the same way for either answer. */
+  private recallFacts(recall: RecallResponse) {
+
+    const facts = [
+      { label: 'Payment', value: recall.transactionReference },
+      { label: 'Their reason', value: `${recall.reasonCode} — ${recall.reasonDescription}` },
+      { label: 'Their reference', value: recall.cancellationId },
+    ];
+
+    if (this.decisionNote.trim()) {
+      facts.push({ label: 'Your note', value: this.decisionNote.trim() });
+    }
+
+    return facts;
+  }
+
+  /**
+   * Accepting takes money out of our customer's account and sends it back to
+   * the other bank. Refusing and accepting sit side by side, and a slip
+   * between them is exactly what a second look is for.
+   */
   accept(recall: RecallResponse): void {
+
+    this.confirm.askThen({
+      title: 'Accept this recall?',
+      message: 'The funds are taken back from our customer and returned to the '
+        + 'sending bank with a pacs.004.',
+      facts: this.recallFacts(recall),
+      note: 'This cannot be undone. The money leaves the customer\'s account '
+        + 'now, whether or not they still hold it.',
+      confirmLabel: 'Accept and return the funds',
+      cancelLabel: 'Go back',
+      danger: true,
+    }, () => this.doAccept(recall));
+  }
+
+  private doAccept(recall: RecallResponse): void {
 
     this.busy.set(recall.id);
     this.error.set('');
@@ -113,6 +151,20 @@ export class RecallQueue implements OnInit {
   }
 
   reject(recall: RecallResponse): void {
+
+    this.confirm.askThen({
+      title: 'Refuse this recall?',
+      message: 'The payment stands and the customer keeps the money. The '
+        + 'sending bank is told the answer is no.',
+      facts: this.recallFacts(recall),
+      note: 'This is the final answer to this request. The other bank would '
+        + 'have to raise a new one to ask again.',
+      confirmLabel: 'Refuse the recall',
+      cancelLabel: 'Go back',
+    }, () => this.doReject(recall));
+  }
+
+  private doReject(recall: RecallResponse): void {
 
     this.busy.set(recall.id);
     this.error.set('');
