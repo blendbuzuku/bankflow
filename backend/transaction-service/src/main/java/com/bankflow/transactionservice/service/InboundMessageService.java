@@ -7,6 +7,7 @@ import com.bankflow.transactionservice.dto.AccountResponse;
 import com.bankflow.common.audit.AuditEventType;
 import com.bankflow.transactionservice.entity.*;
 import com.bankflow.transactionservice.pacs.*;
+import com.bankflow.transactionservice.recall.RecallRequest;
 import com.bankflow.transactionservice.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,13 +136,23 @@ public class InboundMessageService {
             return handleCreditTransfer(parsed);
         }
 
+        /*
+         * Each of these answers or asks about a payment we already hold, and
+         * is filed under it once that payment has been found. Stored on
+         * arrival with no reference, they otherwise belonged to nothing: the
+         * payment's own screen listed what we sent and never what came back,
+         * so the status report that settled it and the return that undid it
+         * could not be seen from the payment at all.
+         */
         if (parsed.isStatusReport()) {
-            handleStatusReport(parsed);
+            Transaction answered = handleStatusReport(parsed);
+            linkToTransaction(parsed, answered.getTransactionReference());
             return "";
         }
 
         if (parsed.isReturn()) {
-            paymentReturnService.receiveReturn(parsed);
+            Transaction returned = paymentReturnService.receiveReturn(parsed);
+            linkToTransaction(parsed, returned.getTransactionReference());
             return "";
         }
 
@@ -150,7 +161,8 @@ public class InboundMessageService {
          * recorded for the queue rather than answered here.
          */
         if (parsed.isCancellationRequest()) {
-            recallService.receiveCancellationRequest(parsed);
+            RecallRequest recall = recallService.receiveCancellationRequest(parsed);
+            linkToTransaction(parsed, recall.getTransactionReference());
             return "";
         }
 
@@ -619,7 +631,8 @@ public class InboundMessageService {
 
     // --- status report about a payment we sent -----------------------------
 
-    private void handleStatusReport(ParsedMessage parsed) {
+    /** @return the payment the report answers, so the report can be filed under it */
+    private Transaction handleStatusReport(ParsedMessage parsed) {
 
         Transaction transaction =
                 transactionRepository.findByEndToEndId(parsed.endToEndId())
@@ -658,7 +671,7 @@ public class InboundMessageService {
 
         if (parsed.status() == TransactionStatusCode.RJCT) {
             unwind(transaction, parsed.reasonCode());
-            return;
+            return transaction;
         }
 
         if (parsed.status() != null && parsed.status().isFinal()) {
@@ -669,6 +682,7 @@ public class InboundMessageService {
          * A non-final acknowledgement (ACTC, ACCP) means the counterparty has
          * the message but has not settled it. The payment stays in flight.
          */
+        return transaction;
     }
 
     private void settle(Transaction transaction) {
