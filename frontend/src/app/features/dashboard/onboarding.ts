@@ -15,6 +15,7 @@ import {
 } from '../../core/validation/countries';
 
 import { Toasts } from '../../core/services/toasts';
+import { AuthService } from '../../core/services/auth';
 
 import {
   AccountService,
@@ -43,9 +44,27 @@ export class Onboarding {
 
   private readonly accountService = inject(AccountService);
   private readonly toasts = inject(Toasts);
+  private readonly authService = inject(AuthService);
 
   /** Emitted so the dashboard can reload once a profile exists. */
   readonly created = output<ClientResponse>();
+
+  constructor() {
+
+    /*
+     * The address they signed up with, already known. The field is required
+     * and used to open empty, so a customer who did not notice it faced a
+     * button that stayed grey with nothing saying why.
+     */
+    this.authService.loadCurrentUser().subscribe({
+      next: user => {
+        if (!this.email && user?.email) {
+          this.email = user.email;
+        }
+      },
+      error: () => { /* they can still type it */ },
+    });
+  }
 
   clientType: ClientType = 'INDIVIDUAL';
 

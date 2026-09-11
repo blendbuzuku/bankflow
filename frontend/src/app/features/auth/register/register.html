@@ -1,15 +1,28 @@
-<div class="register-page">
+<!--
+  Built on the sign-in page's layout and stylesheet, so the two doors into the
+  bank look like the same building. They had drifted: this one was still on
+  the original dark styling long after every other screen had moved on.
+-->
+<div class="auth-page">
 
-  <div class="register-card">
+  <div class="auth-card">
 
     <div class="brand">
-      <h1>BankFlow</h1>
-      <p>Create your account</p>
+      <div class="brand-icon">B</div>
+      <div>
+        <h1>BankFlow</h1>
+        <span>Digital Banking Platform</span>
+      </div>
+    </div>
+
+    <div class="welcome">
+      <h2>Create your account</h2>
+      <p>Register, then complete your details so the bank can open an account for you.</p>
     </div>
 
     <form (ngSubmit)="register()">
 
-      <div class="form-group">
+      <div class="field">
         <label for="username">Username</label>
 
         <input
@@ -18,12 +31,13 @@
           name="username"
           [(ngModel)]="username"
           placeholder="Enter your username"
+          autocomplete="username"
           required
           maxlength="50"
         />
       </div>
 
-      <div class="form-group">
+      <div class="field">
         <label for="email">Email</label>
 
         <input
@@ -32,11 +46,12 @@
           name="email"
           [(ngModel)]="email"
           placeholder="Enter your email"
+          autocomplete="email"
           required
         />
       </div>
 
-      <div class="form-group">
+      <div class="field">
         <label for="password">Password</label>
 
         <input
@@ -45,13 +60,14 @@
           name="password"
           [(ngModel)]="password"
           placeholder="At least 8 characters"
+          autocomplete="new-password"
           required
           minlength="8"
         />
       </div>
 
-      <div class="form-group">
-        <label for="confirmPassword">Confirm Password</label>
+      <div class="field">
+        <label for="confirmPassword">Confirm password</label>
 
         <input
           id="confirmPassword"
@@ -59,18 +75,19 @@
           name="confirmPassword"
           [(ngModel)]="confirmPassword"
           placeholder="Confirm your password"
+          autocomplete="new-password"
           required
         />
       </div>
 
       @if (errorMessage()) {
-        <div class="error-message">
+        <div class="error">
           {{ errorMessage() }}
         </div>
       }
 
       @if (successMessage()) {
-        <div class="success-message">
+        <div class="success">
           {{ successMessage() }}
         </div>
       }
@@ -82,13 +99,13 @@
         @if (loading()) {
           Creating account...
         } @else {
-          Create Account
+          Create account
         }
       </button>
 
     </form>
 
-    <div class="login-link">
+    <div class="register-link">
       Already have an account?
       <a routerLink="/login">Sign in</a>
     </div>

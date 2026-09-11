@@ -8,7 +8,7 @@ import { Toasts } from '../../../core/services/toasts';
   selector: 'app-register',
   imports: [FormsModule, RouterLink],
   templateUrl: './register.html',
-  styleUrl: './register.css',
+  styleUrls: ['../login/login.css', './register.css'],
 })
 export class Register {
 
