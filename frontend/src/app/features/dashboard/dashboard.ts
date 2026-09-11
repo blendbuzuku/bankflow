@@ -354,6 +354,16 @@ export class Dashboard implements OnInit, HasUnsavedChanges {
 
   /** Only a payment that left the bank has a scheme message behind it. */
   hasMessage(transaction: TransactionResponse): boolean {
+
+    /*
+     * A payment still waiting for its second approver, or turned down by
+     * them, never reached the scheme, so there is no message to show. Offering
+     * the button anyway opened a row that could only say so.
+     */
+    if (transaction.status === 'PENDING_APPROVAL' || transaction.status === 'DECLINED') {
+      return false;
+    }
+
     return transaction.paymentType !== 'INTERNAL'
       && transaction.transactionType === 'TRANSFER';
   }

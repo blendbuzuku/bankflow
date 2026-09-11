@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { DecimalPipe, formatNumber } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -242,9 +242,19 @@ export class PaymentForm implements OnInit, HasUnsavedChanges {
   readonly submitting = signal(false);
   readonly submitError = signal('');
 
-  readonly rail = computed<Rail>(() =>
-    this.rails.find(r => r.code === this.paymentType) ?? this.rails[0],
-  );
+  /**
+   * The rail chosen, read afresh each time.
+   *
+   * A method, not a computed. The choice lives in a plain ngModel field, and
+   * a computed only recalculates when a signal it read changes — this one
+   * read none, so it held the rail the form opened on for as long as the
+   * form was open. Picking RTGS kept ACH's charge options, and picking an
+   * internal transfer still asked for a beneficiary IBAN and sent no account
+   * to credit.
+   */
+  rail(): Rail {
+    return this.rails.find(r => r.code === this.paymentType) ?? this.rails[0];
+  }
 
   ngOnInit(): void {
 
