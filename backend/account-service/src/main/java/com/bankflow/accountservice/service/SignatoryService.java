@@ -91,6 +91,20 @@ public class SignatoryService {
         signatory.setAuthority(SignatoryAuthority.SIGNATORY);
         signatory.setPrimary(true);
 
+        /*
+         * The registrant is the person signed in: they are opening their own
+         * record. Left unset, every self-registered client's signatory row had
+         * an id and no name, so the one person able to move the money showed
+         * on screen as a blank — while signatories added by staff carried
+         * both. Only taken from the session when it is the same person.
+         */
+        AuthenticatedUser actor = SecurityUtils.getCurrentUser();
+
+        if (actor != null && userId != null && userId.equals(actor.userId())) {
+            signatory.setUsername(actor.username());
+            signatory.setAddedByUsername(actor.username());
+        }
+
         return signatoryRepository.save(signatory);
     }
 
