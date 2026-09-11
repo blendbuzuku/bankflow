@@ -32,6 +32,7 @@ public class KipsController {
     private final Pacs004Builder pacs004Builder;
     private final MessageIdGenerator messageIdGenerator;
     private final SchemeQueueService schemeQueue;
+    private final BusinessApplicationHeaderBuilder headerBuilder;
 
     public KipsController(
             InboundMessageService inboundMessageService,
@@ -40,9 +41,11 @@ public class KipsController {
             Pacs002Builder pacs002Builder,
             Pacs004Builder pacs004Builder,
             MessageIdGenerator messageIdGenerator,
-            SchemeQueueService schemeQueue) {
+            SchemeQueueService schemeQueue,
+            BusinessApplicationHeaderBuilder headerBuilder) {
 
         this.schemeQueue = schemeQueue;
+        this.headerBuilder = headerBuilder;
 
         this.inboundMessageService = inboundMessageService;
         this.transactionRepository = transactionRepository;
@@ -127,16 +130,32 @@ public class KipsController {
             );
         }
 
-        String pacs002 = pacs002Builder.build(
-                messageIdGenerator.newMessageId(),
+        /*
+         * Built for the payment's own rail and delivered the way that rail
+         * delivers.
+         *
+         * This used to build every answer as ACH and put an RTGS payment's
+         * UETR in OrgnlTxId. A UUID is 36 characters and that field is
+         * Max35Text, so the answer failed the schema, was discarded as
+         * malformed — answers are not answered back — and the payment stayed
+         * SENT with its money in suspense. No RTGS payment could settle.
+         */
+        String rail = transaction.getPaymentType().schemaRail();
+        boolean rtgs = "rtgs".equals(rail);
+        String messageId = messageIdGenerator.newMessageId();
+
+        String document = pacs002Builder.build(
+                messageId,
                 original.getMessageId(),
                 transaction.getEndToEndId(),
-                transaction.getUetr() != null
-                        ? transaction.getUetr()
-                        : transaction.getTransactionReference(),
+                transaction.getTransactionReference(),
+                rtgs ? transaction.getUetr() : null,
                 status,
-                reason
+                reason,
+                rail
         );
+
+        String pacs002 = asDelivered(messageId, PacsMessageType.PACS_002, document, rail);
 
         inboundMessageService.receive(pacs002);
 
@@ -175,17 +194,41 @@ public class KipsController {
         BigDecimal amount =
                 returnedAmount != null ? returnedAmount : transaction.getAmount();
 
-        String pacs004 = pacs004Builder.build(
-                messageIdGenerator.newMessageId(),
+        String rail = transaction.getPaymentType().schemaRail();
+        String messageId = messageIdGenerator.newMessageId();
+
+        String document = pacs004Builder.build(
+                messageId,
                 messageIdGenerator.newMessageId(),
                 transaction,
                 amount,
                 reason,
-                transaction.getPaymentType().schemaRail()
+                rail
         );
+
+        String pacs004 = asDelivered(messageId, PacsMessageType.PACS_004, document, rail);
 
         inboundMessageService.receive(pacs004);
 
         return ResponseEntity.ok(pacs004);
+    }
+
+    /**
+     * What the scheme would actually put on the wire.
+     *
+     * RTGS messages arrive inside the operator's envelope under a business
+     * application header, and that header is how the inbound side knows which
+     * schema set to check against. A bare document is ACH by definition, so
+     * an RTGS answer sent without one was validated against the wrong schema.
+     */
+    private String asDelivered(
+            String messageId,
+            PacsMessageType type,
+            String document,
+            String rail) {
+
+        return "rtgs".equals(rail)
+                ? headerBuilder.wrapInbound(messageId, type, document)
+                : document;
     }
 }

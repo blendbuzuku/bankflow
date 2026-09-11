@@ -63,6 +63,18 @@ public class Pacs004Builder {
 
         boolean rtgs = "rtgs".equals(rail);
 
+        /*
+         * RTGS is a different message, not the ACH one in another namespace.
+         * HVPS+ drops the batch total and the header agents, requires a
+         * clearing system and the original UETR, moves the agents onto the
+         * transaction, and describes the parties in a return chain rather
+         * than an original-transaction reference. Built as ACH, every RTGS
+         * return failed the schema and was discarded, so none could land.
+         */
+        if (rtgs) {
+            return buildRtgs(messageId, returnId, original, returnedAmount, reason);
+        }
+
         XmlBuilder xml = XmlBuilder.create();
 
         Element document = xml.root(
@@ -179,6 +191,127 @@ public class Pacs004Builder {
         account(xml, originalRef, "CdtrAcct", original.getCreditorIban());
 
         return xml.toXml();
+    }
+
+    /**
+     * pacs.004.001.10 in the HVPS+ usage KIPS publishes for RTGS.
+     *
+     * Element order follows PaymentTransaction118__1 exactly; the schema is a
+     * sequence, so an element out of place fails validation even when every
+     * value in it is right.
+     */
+    private String buildRtgs(
+            String messageId,
+            String returnId,
+            Transaction original,
+            BigDecimal returnedAmount,
+            ReasonCode reason) {
+
+        if (original.getUetr() == null) {
+            throw new IllegalArgumentException(
+                    "An RTGS return must name the original UETR, and %s has none"
+                            .formatted(original.getTransactionReference())
+            );
+        }
+
+        String currency = original.getCurrency().name();
+
+        XmlBuilder xml = XmlBuilder.create();
+
+        Element document = xml.root(
+                PacsMessageType.PACS_004.getNamespace("rtgs"), "Document"
+        );
+
+        Element body = xml.child(document, "PmtRtr");
+
+        // --- group header: identity and how it settles, nothing else ---
+
+        Element groupHeader = xml.child(body, "GrpHdr");
+
+        xml.text(groupHeader, "MsgId", messageId);
+        xml.text(groupHeader, "CreDtTm", XmlBuilder.formatDateTime(OffsetDateTime.now()));
+        xml.text(groupHeader, "NbOfTxs", "1");
+
+        Element settlement = xml.child(groupHeader, "SttlmInf");
+
+        xml.text(
+                settlement,
+                "SttlmMtd",
+                original.getPaymentType().getSettlementMethod().getCode()
+        );
+
+        Element clearing = xml.child(settlement, "ClrSys");
+        xml.text(clearing, "Cd", properties.getRtgsClearingSystem());
+
+        // --- the returned transaction ---
+
+        Element tx = xml.child(body, "TxInf");
+
+        xml.text(tx, "RtrId", returnId);
+
+        Element originalGroup = xml.child(tx, "OrgnlGrpInf");
+        xml.text(originalGroup, "OrgnlMsgId", original.getTransactionReference());
+        xml.text(originalGroup, "OrgnlMsgNmId", PacsMessageType.PACS_008.getIdentifier("rtgs"));
+
+        xml.optional(tx, "OrgnlInstrId", original.getInstructionId());
+        xml.text(tx, "OrgnlEndToEndId", original.getEndToEndId());
+        xml.text(tx, "OrgnlTxId", original.getTransactionReference());
+        xml.text(tx, "OrgnlUETR", original.getUetr());
+
+        xml.text(tx, "OrgnlIntrBkSttlmAmt", money(original.getAmount()))
+                .setAttribute("Ccy", currency);
+
+        xml.text(tx, "RtrdIntrBkSttlmAmt", money(returnedAmount))
+                .setAttribute("Ccy", currency);
+
+        xml.text(tx, "IntrBkSttlmDt", LocalDate.now().format(DATE));
+
+        agent(xml, tx, "InstgAgt", properties.getBic());
+        agent(xml, tx, "InstdAgt", properties.getOperatorBic());
+
+        /*
+         * The return chain restates who paid whom in the original payment.
+         * Debtor and creditor are both required, so a missing name falls back
+         * to the account rather than leaving the element out.
+         */
+        Element chain = xml.child(tx, "RtrChain");
+
+        requiredParty(xml, chain, "Dbtr", original.getDebtorName(), original.getDebtorIban());
+        account(xml, chain, "DbtrAcct", original.getDebtorIban());
+        agent(xml, chain, "DbtrAgt",
+                original.getDebtorAgentBic() != null
+                        ? original.getDebtorAgentBic()
+                        : properties.getBic());
+
+        agent(xml, chain, "CdtrAgt", original.getCreditorAgentBic());
+        requiredParty(xml, chain, "Cdtr", original.getCreditorName(), original.getCreditorIban());
+        account(xml, chain, "CdtrAcct", original.getCreditorIban());
+
+        // --- why ---
+
+        Element returnReason = xml.child(tx, "RtrRsnInf");
+
+        Element originator = xml.child(returnReason, "Orgtr");
+        xml.text(originator, "Nm", properties.getBankName());
+
+        Element reasonElement = xml.child(returnReason, "Rsn");
+        xml.text(reasonElement, "Cd", reason.getCode());
+
+        xml.text(returnReason, "AddtlInf", truncate(reason.getDescription()));
+
+        return xml.toXml();
+    }
+
+    private void requiredParty(
+            XmlBuilder xml, Element parent, String name, String value, String fallback) {
+
+        String shown = value != null && !value.isBlank()
+                ? value
+                : fallback != null && !fallback.isBlank() ? fallback : "Not stated";
+
+        Element wrapper = xml.child(parent, name);
+        Element party = xml.child(wrapper, "Pty");
+        xml.text(party, "Nm", shown);
     }
 
     private void party(

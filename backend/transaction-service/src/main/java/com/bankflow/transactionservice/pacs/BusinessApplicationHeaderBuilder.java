@@ -50,7 +50,8 @@ public class BusinessApplicationHeaderBuilder {
         XmlBuilder xml = XmlBuilder.create();
         Element header = xml.root(HEAD_NAMESPACE, "AppHdr");
 
-        appendHeaderContent(xml, header, messageId, messageType);
+        appendHeaderContent(xml, header, messageId, messageType,
+                properties.getBic(), properties.getOperatorBic());
 
         return xml.toXml();
     }
@@ -67,13 +68,37 @@ public class BusinessApplicationHeaderBuilder {
             PacsMessageType messageType,
             String documentXml) {
 
+        return wrap(messageId, messageType, documentXml,
+                properties.getBic(), properties.getOperatorBic());
+    }
+
+    /**
+     * A transmission as the scheme delivers it to us: from the operator,
+     * addressed to this bank — the reverse of what we send.
+     */
+    public String wrapInbound(
+            String messageId,
+            PacsMessageType messageType,
+            String documentXml) {
+
+        return wrap(messageId, messageType, documentXml,
+                properties.getOperatorBic(), properties.getBic());
+    }
+
+    private String wrap(
+            String messageId,
+            PacsMessageType messageType,
+            String documentXml,
+            String fromBic,
+            String toBic) {
+
         XmlBuilder xml = XmlBuilder.create();
         Element envelope = xml.root(ENVELOPE_NAMESPACE, "Message");
 
         Element header = xml.element(HEAD_NAMESPACE, "AppHdr");
         envelope.appendChild(header);
 
-        appendHeaderContent(xml, header, messageId, messageType);
+        appendHeaderContent(xml, header, messageId, messageType, fromBic, toBic);
 
         Element documentElement = parse(documentXml).getDocumentElement();
 
@@ -96,7 +121,9 @@ public class BusinessApplicationHeaderBuilder {
             XmlBuilder xml,
             Element header,
             String messageId,
-            PacsMessageType messageType) {
+            PacsMessageType messageType,
+            String fromBic,
+            String toBic) {
 
         if (!MessageIdGenerator.isValidBusinessMessageId(messageId)) {
             throw new IllegalArgumentException(
@@ -105,11 +132,18 @@ public class BusinessApplicationHeaderBuilder {
             );
         }
 
-        party(xml, header, "Fr", properties.getBic());
-        party(xml, header, "To", properties.getOperatorBic());
+        party(xml, header, "Fr", fromBic);
+        party(xml, header, "To", toBic);
 
         xml.text(header, "BizMsgIdr", messageId);
-        xml.text(header, "MsgDefIdr", messageType.getIdentifier());
+
+        /*
+         * The RTGS identifier, because only RTGS carries a header. For most
+         * messages the two agree; for pacs.004 they do not (.10 against ACH's
+         * .09), and the header would have named a definition different from
+         * the document it carries.
+         */
+        xml.text(header, "MsgDefIdr", messageType.getIdentifier("rtgs"));
         xml.text(header, "BizSvc", properties.getBusinessService());
 
         /*
